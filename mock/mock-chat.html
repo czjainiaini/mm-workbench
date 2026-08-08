@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>聊天页 1:1 复刻沙盒 v3</title>
+<style>
+  /* ══════════════════════════════════════════════════════════
+     v3：移动端实测取样（412px 测量框）+ uni-app 同款 rem 缩放
+     html font-size = 宽/750*32（实测 412px → 17.5787px）
+     ══════════════════════════════════════════════════════════ */
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden}
+  body{
+    background-color:#17181a;
+    font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Helvetica,Arial,sans-serif;
+    color:#fff;
+  }
+  uni-app,uni-page,uni-page-body{display:block;height:100%}
+  #app{display:flex;flex-direction:column;height:100%}
+  img{display:block}
+
+  /* ── 顶栏（实测：高 2.8125rem，透明） ── */
+  .header-box{height:2.8125rem;flex-shrink:0;display:flex;align-items:center;padding:0 0.68rem;position:relative;z-index:6}
+  .icon-back{width:1.8rem;height:1.8rem;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .icon-back img{width:1.25rem;height:1.25rem}
+  .header-center{display:flex;align-items:center;margin-left:0.25rem;min-width:0}
+  .header-role-img{width:1.5625rem;height:1.5625rem;border-radius:50%;overflow:hidden;flex-shrink:0;background:#2c2e32}
+  .header-role-img img{width:100%;height:100%;object-fit:cover}
+  .header-roleName{color:#fff;font-size:0.9375rem;margin:0 0.3rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .header-right{margin-left:auto;display:flex;align-items:center}
+  .header-right .hicon{width:1.9rem;height:1.9rem;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .header-right .hicon img{width:1.06rem;height:1.06rem}
+
+  /* ── 消息区（实测：列表 padding-bottom 10.625rem，无横向 padding） ── */
+  .scroll-view{flex:1;overflow-y:auto;overflow-x:hidden}
+  .chat-body{display:flex;flex-direction:column;padding:0 0 10.625rem}
+  .chat-body .item{display:flex;flex-direction:column}
+  .chat-body .item.Ai{align-items:flex-start}
+  .chat-body .item.self{align-items:flex-end}
+  .Ai,.self{margin-top:0.9375rem}                            /* 实测 */
+  .chat-body .touch-scope{max-width:100%;width:100%;display:flex;flex-direction:column}
+  .item.self .touch-scope{width:auto;max-width:86%}
+  .chat-body .content{font-size:15px;color:#fff;line-height:1.55;word-break:break-word}  /* 实测 15px 不缩放 */
+  .chat-body .content.left{
+    background-color:#17181a;                               /* 实测与页同色 */
+    border-radius:0.5rem;                                   /* 实测 */
+    padding:0.75rem;                                        /* 实测 */
+    box-shadow:0 0.125rem 0.125rem 0 rgba(0,0,0,.01);       /* 实测 */
+  }
+  .chat-body .content.right{background-color:#33353b;border-radius:0.5rem;padding:0.55rem 0.75rem}
+  /* 消息操作条（点击消息出现：复制/重写/分支/删除） */
+  .msg-actions{display:none;align-items:center;gap:1rem;padding:0.4rem 0.75rem}
+  .item.show-actions .msg-actions{display:flex}
+  .msg-actions img{width:1.06rem;height:1.06rem;cursor:pointer;opacity:.75}
+  .msg-actions img:hover{opacity:1}
+
+  /* AI 富文本渲染区（.tavern-sandbox 挂载点，低调容器默认样式） */
+  .tavern-sandbox{font-family:system-ui,sans-serif;color:#e2e8f0;font-size:15px;line-height:1.7}
+  .tavern-sandbox p{margin:0 0 0.5rem}
+  .tavern-sandbox .st-status{display:flex;flex-wrap:wrap;gap:0.25rem 0.75rem;font-size:13px;color:#8b93a7;
+    background:#0d0e15;border-radius:0.6rem;padding:0.5rem 0.75rem;margin-top:0.6rem}
+
+  /* ── 底部区 ── */
+  .chat-bottom{flex-shrink:0;position:relative;z-index:5;background:linear-gradient(180deg,rgba(23,24,26,0),#17181a 30%)}
+  /* 快捷栏（实测：高 2.375rem；按钮 #2c2e32 / 0.75rem 字 / 圆角0.875rem / 高1.75rem） */
+  .shortcut-bar-wrapper{background-color:#17181a;height:2.375rem;display:flex;align-items:center;overflow-x:auto}
+  .shortcut-bar{display:flex;gap:0.5rem;padding:0 0.6rem}
+  .shortcut-btn{
+    background-color:#2c2e32;color:#fff;font-size:0.75rem;border-radius:0.875rem;
+    height:1.75rem;padding:0 0.5rem;display:inline-flex;align-items:center;gap:0.28rem;
+    flex-shrink:0;cursor:pointer;border:0;white-space:nowrap;
+  }
+  .shortcut-btn img{width:0.875rem;height:0.875rem}
+
+  /* 输入区（实测：bg #1e1f24 / 粉边 0.8px #ff6d97 / 圆角 0.75rem / padding 0.3125rem 0.5rem） */
+  .send-msg{padding:0.34rem 0.6rem 0.6rem}
+  .chat-input-scope{
+    background-color:#1e1f24;
+    border:0.8px solid #ff6d97;
+    border-radius:0.75rem;
+    padding:0.3125rem 0.5rem;
+  }
+  .chat-input-collapsed-display{padding:0 0.375rem;min-height:1.5rem;display:flex;align-items:center;cursor:text}
+  .input-placeholder{color:#8a8f98;font-size:16px;font-family:"PingFang SC",sans-serif}
+  .chatMsgTextarea{display:none}
+  .chatMsgTextarea textarea{
+    width:100%;background:transparent;border:0;outline:0;resize:none;
+    color:#fff;font-size:16px;font-family:"PingFang SC",sans-serif;line-height:1.4;
+    min-height:1.5rem;max-height:5.5rem;
+  }
+  /* 展开后底行（实测：左 "20"+电池，右 发送/加号） */
+  .chat-input-bottom-row{display:none;align-items:center;margin-top:0.3rem}
+  .mind-type{display:flex;align-items:center;gap:0.2rem;font-size:0.75rem;color:#9aa0a6}
+  .mind-type img{width:0.9rem;height:0.9rem}
+  .chat-input-bottom-row .spacer{flex:1}
+  .row-btn{width:1.6rem;height:1.6rem;background:transparent;border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;margin-left:0.55rem}
+  .row-btn img{width:1.25rem;height:1.25rem}
+  .chat-send-proxy{width:0;height:0;opacity:0;pointer-events:none}
+
+  /* ── 弹窗（u-popup 风格底部面板） ── */
+  .popup-mask{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;opacity:0;pointer-events:none;transition:opacity .2s}
+  .popup-mask.open{opacity:1;pointer-events:auto}
+  .popup-sheet{
+    position:fixed;left:0;right:0;bottom:0;z-index:51;background:#212226;
+    border-radius:0.75rem 0.75rem 0 0;transform:translateY(100%);transition:transform .22s ease;
+    max-height:72%;display:flex;flex-direction:column;
+  }
+  .popup-sheet.open{transform:translateY(0)}
+  .popup-head{display:flex;align-items:center;height:2.9rem;padding:0 1rem;border-bottom:1px solid #2c2e32;flex-shrink:0}
+  .popup-head .ph-cancel{color:#8a8f98;font-size:0.85rem;cursor:pointer}
+  .popup-head .ph-title{flex:1;text-align:center;font-size:0.95rem;font-weight:600}
+  .popup-head .ph-ok{color:#ff6d97;font-size:0.85rem;cursor:pointer}
+  .popup-body{overflow:auto;padding:0.4rem 0}
+  .sheet-item{display:flex;align-items:center;padding:0.85rem 1rem;font-size:0.9rem;cursor:pointer}
+  .sheet-item:active{background:#26272c}
+  .sheet-item .desc{margin-left:auto;color:#8a8f98;font-size:0.75rem}
+  .sheet-item.selected{color:#ff6d97}
+  .sheet-item.selected::after{content:"✓";margin-left:0.5rem}
+  .switch{width:2.5rem;height:1.4rem;border-radius:0.7rem;background:#3a3c42;position:relative;transition:background .2s;flex-shrink:0}
+  .switch::after{content:"";position:absolute;width:1.1rem;height:1.1rem;border-radius:50%;background:#fff;top:0.15rem;left:0.15rem;transition:left .2s}
+  .switch.on{background:#ff6d97}
+  .switch.on::after{left:1.25rem}
+  .sheet-textarea{margin:0.7rem 1rem;width:calc(100% - 2rem);height:6rem;background:#17181a;border:1px solid #2c2e32;border-radius:0.5rem;color:#fff;padding:0.6rem;font-size:0.85rem;resize:none;outline:none}
+
+  /* toast */
+  .toast{position:fixed;left:50%;top:42%;transform:translateX(-50%);background:rgba(0,0,0,.78);color:#fff;
+    font-size:0.8rem;padding:0.55rem 1rem;border-radius:0.5rem;z-index:60;opacity:0;transition:opacity .18s;pointer-events:none;max-width:80%;text-align:center}
+  .toast.show{opacity:1}
+
+  ::-webkit-scrollbar{width:0;height:0}
+</style>
+</head>
+<body>
+<uni-app><uni-page><uni-page-body>
+<div id="app" class="chat">
+  <!-- ══ 顶栏 ══ -->
+  <div class="header-box">
+    <div class="icon-back" data-act="back"><img src="site-assets/arrow_back_dark.png" alt="返回"></div>
+    <div class="header-center">
+      <div class="header-role-img"><img src="site-assets/ico_aihelp.png" alt="头像"></div>
+      <div class="header-roleName">测试</div>
+    </div>
+    <div class="header-right">
+      <div class="hicon" data-act="comment" title="评论"><img src="site-assets/ico_comment_dark.png"></div>
+      <div class="hicon" data-act="share" title="分享"><img src="site-assets/ico_share2_dark.png"></div>
+      <div class="hicon" data-act="collect" title="收藏"><img src="site-assets/ico_collect_dark.png"></div>
+      <div class="hicon" data-act="refresh" title="重新生成"><img src="site-assets/ico_refresh2_dark.png"></div>
+      <div class="hicon" data-act="more" title="更多"><img src="site-assets/ico_more_dark.png"></div>
+    </div>
+  </div>
+
+  <!-- ══ 消息区 ══ -->
+  <uni-scroll-view id="scrollview" class="scroll-view dark">
+    <div class="uni-scroll-view">
+      <div class="uni-scroll-view-content">
+        <div class="chat-body" id="msglistview"></div>
+      </div>
+    </div>
+  </uni-scroll-view>
+
+  <!-- ══ 底部 ══ -->
+  <div class="chat-bottom">
+    <div class="chat-bottom-wapper">
+      <div class="shortcut-bar-wrapper theme-dark">
+        <div class="shortcut-bar">
+          <button class="shortcut-btn" data-act="model"><img src="site-assets/ico_setting2_dark.png"><span>模型设置</span></button>
+          <button class="shortcut-btn" data-act="chatset"><img src="site-assets/ico_chat_set_dark.svg"><span>对话设置</span></button>
+          <button class="shortcut-btn" data-act="instruction"><img src="site-assets/ico_instruction_dark.png"><span>选择指令</span></button>
+          <button class="shortcut-btn" data-act="rechat"><img src="site-assets/ico_rechat2_dark.png"><span>新的聊天</span></button>
+          <button class="shortcut-btn" data-act="persona"><img src="site-assets/ico_user_setting_dark.svg"><span>用户人设</span></button>
+        </div>
+      </div>
+      <div class="send-msg">
+        <div class="chat-input-scope">
+          <div class="chat-input-collapsed-display">
+            <span class="input-placeholder">快来聊天吧~</span>
+          </div>
+          <uni-textarea class="chatMsgTextarea">
+            <textarea class="uni-textarea-textarea" maxlength="140" placeholder="快来聊天吧~"></textarea>
+          </uni-textarea>
+          <div class="chat-input-bottom-row">
+            <div class="mind-type">20 <img src="site-assets/ico_battery2_dark.png" alt="体力"></div>
+            <div class="spacer"></div>
+            <button class="row-btn" data-act="aihelp" title="AI帮写"><img src="site-assets/ico_aihelp.png"></button>
+            <button class="row-btn" data-act="send" title="发送"><img src="site-assets/ico_send_dark.png"></button>
+            <uni-image class="chat-send-proxy"></uni-image>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗与 toast 骨架 -->
+<div class="popup-mask" id="popupMask"></div>
+<div class="popup-sheet" id="popupSheet">
+  <div class="popup-head">
+    <span class="ph-cancel" id="phCancel">取消</span>
+    <span class="ph-title" id="phTitle">标题</span>
+    <span class="ph-ok" id="phOk">确定</span>
+  </div>
+  <div class="popup-body" id="popupBody"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  var D = document;
+
+  /* ══ uni-app 同款 rem 缩放：宽/750*32 ══ */
+  function fitRoot() {
+    D.documentElement.style.fontSize = D.documentElement.clientWidth / 750 * 32 + 'px';
+  }
+  fitRoot();
+  window.addEventListener('resize', fitRoot);
+
+  /* ══ 状态 ══ */
+  var msgSeq = 1000;
+  var stats = { love: 43, energy: 85 };
+  var model = '均衡模型 · DeepChat-V3';
+  var persona = '';
+
+  /* ══ 基础组件 ══ */
+  function toast(text) {
+    var t = D.getElementById('toast');
+    t.textContent = text;
+    t.classList.add('show');
+    clearTimeout(t._h);
+    t._h = setTimeout(function () { t.classList.remove('show'); }, 1600);
+  }
+  var popupConfirmFn = null;
+  function openSheet(title, bodyHTML, onOk) {
+    D.getElementById('phTitle').textContent = title;
+    D.getElementById('popupBody').innerHTML = bodyHTML;
+    D.getElementById('popupMask').classList.add('open');
+    D.getElementById('popupSheet').classList.add('open');
+    popupConfirmFn = onOk || null;
+  }
+  function closeSheet() {
+    D.getElementById('popupMask').classList.remove('open');
+    D.getElementById('popupSheet').classList.remove('open');
+    popupConfirmFn = null;
+  }
+  D.getElementById('popupMask').onclick = closeSheet;
+  D.getElementById('phCancel').onclick = closeSheet;
+  D.getElementById('phOk').onclick = function () { if (popupConfirmFn) popupConfirmFn(); closeSheet(); };
+
+  /* ══ 消息渲染 ══ */
+  function statusBar() {
+    return '<div class="st-status">❤ 好感 ' + stats.love + ' ｜ ⚡ 精力 ' + stats.energy + ' ｜ 📍 魔界·寝宫 ｜ 🕘 夜</div>';
+  }
+  var ACTIONS = '<div class="msg-actions">' +
+    '<img src="site-assets/ico_copy_dark.png" data-ma="copy" title="复制">' +
+    '<img src="site-assets/ico_return_dark.png" data-ma="regen" title="重写">' +
+    '<img src="site-assets/ico_fenzhi_dark.png" data-ma="branch" title="分支">' +
+    '<img src="site-assets/ico_delete_dark.png" data-ma="del" title="删除"></div>';
+
+  function addMsg(who, html, silent) {
+    var list = D.getElementById('msglistview');
+    var item = D.createElement('div');
+    item.className = 'item ' + (who === 'self' ? 'self' : 'Ai');
+    msgSeq++;
+    var prefix = who === 'self' ? 's-' : 'q-';
+    item.innerHTML = '<div class="touch-scope" id="item' + msgSeq + '">' +
+      '<div class="content ' + (who === 'self' ? 'right' : 'left') + '" id="' + prefix + msgSeq + '">' +
+      (who === 'self' ? html : '<div class="tavern-sandbox">' + html + '</div>') +
+      '</div></div>' + ACTIONS;
+    list.appendChild(item);
+    item.addEventListener('click', function (e) {
+      var ma = e.target.getAttribute && e.target.getAttribute('data-ma');
+      if (ma) { msgAction(ma, item); return; }
+      D.querySelectorAll('.item.show-actions').forEach(function (x) { if (x !== item) x.classList.remove('show-actions'); });
+      item.classList.toggle('show-actions');
+    });
+    if (!silent) scrollBottom();
+    return item;
+  }
+  function msgAction(ma, item) {
+    var text = item.innerText;
+    if (ma === 'copy') {
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { toast('已复制'); }, function () { toast('复制失败'); });
+      else toast('剪贴板不可用');
+    } else if (ma === 'del') {
+      item.remove(); toast('已删除');
+    } else if (ma === 'regen') {
+      item.remove(); aiReply('再试一次'); toast('重新生成中…');
+    } else if (ma === 'branch') {
+      toast('已创建剧情分支（演示）');
+    }
+    item.classList.remove('show-actions');
+  }
+  function scrollBottom() {
+    var sv = D.getElementById('scrollview');
+    sv.scrollTop = sv.scrollHeight;
+  }
+  function aiReply(userText) {
+    stats.love = Math.min(99, stats.love + 1);
+    stats.energy = Math.max(10, stats.energy - 2);
+    setTimeout(function () {
+      var pool = [
+        '<p>嗯…「' + (userText || '').slice(0, 20) + '」？你的话总让我在意呢。</p>',
+        '<p>说得好～那就依你，接下来的剧情由你来定。</p>',
+        '<p>（轻笑）你总是能说出让我意外的话。</p>'
+      ];
+      /* 状态栏不是页面自带的：只有开启「自动状态栏」（模拟作者卡正则效果）时才随回复输出 */
+      addMsg('ai', pool[Math.floor(Math.random() * pool.length)] + (chatSets.statusbar ? statusBar() : ''));
+    }, 620);
+  }
+
+  /* ══ 输入区：折叠→展开 ══ */
+  var collapsed = D.querySelector('.chat-input-collapsed-display');
+  var taWrap = D.querySelector('.chatMsgTextarea');
+  var bottomRow = D.querySelector('.chat-input-bottom-row');
+  var input = D.querySelector('.chatMsgTextarea textarea');
+  collapsed.addEventListener('click', function () {
+    collapsed.style.display = 'none';
+    taWrap.style.display = 'block';
+    bottomRow.style.display = 'flex';
+    input.focus();
+  });
+  function send() {
+    var text = (input.value || '').trim();
+    if (!text) return;
+    addMsg('self', text.replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }));
+    input.value = '';
+    aiReply(text);
+  }
+
+  /* ══ 全局点击路由（顶栏/快捷栏/输入行） ══ */
+  D.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-act]');
+    if (!el) return;
+    var act = el.getAttribute('data-act');
+    if (act === 'back') toast('返回上一页（沙盒演示）');
+    else if (act === 'comment') toast('评论功能（沙盒演示）');
+    else if (act === 'share') toast('已生成分享链接（沙盒演示）');
+    else if (act === 'collect') toast('已收藏该角色');
+    else if (act === 'refresh') { if (D.querySelector('.item.Ai:last-of-type')) { msgAction('regen', D.querySelector('.chat-body .item.Ai:last-of-type')); } else toast('没有可重写的回复'); }
+    else if (act === 'more') openMoreMenu();
+    else if (act === 'model') openModelSheet();
+    else if (act === 'chatset') openChatSetSheet();
+    else if (act === 'instruction') openInstructionSheet();
+    else if (act === 'rechat') confirmNewChat();
+    else if (act === 'persona') openPersonaSheet();
+    else if (act === 'aihelp') { input.value = '（AI 帮写）今晚想听你讲讲魔界的故事'; input.focus(); toast('AI 已为你起草'); }
+    else if (act === 'send') send();
+  });
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); send(); } });
+
+  /* ══ 各弹窗 ══ */
+  var MODELS = ['均衡模型 · DeepChat-V3', '创意模型 · Muse-7B', '长文模型 · Saga-32K'];
+  function openModelSheet() {
+    var html = MODELS.map(function (m) {
+      return '<div class="sheet-item' + (m === model ? ' selected' : '') + '" data-model="' + m + '">' + m + '<span class="desc">' + (m === model ? '使用中' : '') + '</span></div>';
+    }).join('');
+    openSheet('模型设置', html);
+    D.getElementById('popupBody').querySelectorAll('[data-model]').forEach(function (it) {
+      it.onclick = function () {
+        model = it.getAttribute('data-model');
+        D.getElementById('popupBody').querySelectorAll('.sheet-item').forEach(function (x) { x.classList.remove('selected'); x.querySelector('.desc').textContent = ''; });
+        it.classList.add('selected'); it.querySelector('.desc').textContent = '使用中';
+        toast('已切换：' + model);
+      };
+    });
+  }
+  var chatSets = { stream: true, statusbar: false, depth: false };
+  function openChatSetSheet() {
+    function row(k, name, desc) {
+      return '<div class="sheet-item" data-set="' + k + '">' + name + '<span class="desc">' + desc + '</span><span style="width:.6rem"></span><div class="switch' + (chatSets[k] ? ' on' : '') + '"></div></div>';
+    }
+    openSheet('对话设置',
+      row('stream', '流式输出', '逐字显示回复') +
+      row('statusbar', '自动状态栏', '模拟作者卡正则，每轮回复携带状态') +
+      row('depth', '深度上下文', '消耗更多体力'));
+    D.getElementById('popupBody').querySelectorAll('[data-set]').forEach(function (it) {
+      it.onclick = function () {
+        var k = it.getAttribute('data-set');
+        chatSets[k] = !chatSets[k];
+        it.querySelector('.switch').classList.toggle('on', chatSets[k]);
+        toast((chatSets[k] ? '开启 ' : '关闭 ') + it.childNodes[0].textContent);
+      };
+    });
+  }
+  var INSTRUCTIONS = ['更新状态栏', '推进到夜晚剧情', '触发随机事件', '切换场景：集市', '回顾当前设定'];
+  function openInstructionSheet() {
+    var html = INSTRUCTIONS.map(function (s) { return '<div class="sheet-item" data-ins="' + s + '">▸ ' + s + '</div>'; }).join('');
+    openSheet('选择指令', html);
+    D.getElementById('popupBody').querySelectorAll('[data-ins]').forEach(function (it) {
+      it.onclick = function () {
+        var s = it.getAttribute('data-ins');
+        closeSheet();
+        collapsed.style.display = 'none'; taWrap.style.display = 'block'; bottomRow.style.display = 'flex';
+        input.value = s; input.focus();
+        toast('指令已填入输入框');
+      };
+    });
+  }
+  function confirmNewChat() {
+    openSheet('新的聊天', '<div class="sheet-item">确定要清空当前对话、重新开始吗？<span class="desc">不可恢复</span></div>', function () {
+      D.getElementById('msglistview').innerHTML = '';
+      stats = { love: 43, energy: 85 };
+      addMsg('ai', '<p>新的开始～这一次，你想从哪里讲起？</p>' + statusBar());
+      toast('已开始新的聊天');
+    });
+  }
+  function openPersonaSheet() {
+    openSheet('用户人设', '<textarea class="sheet-textarea" id="personaTa" placeholder="写下你的人设，AI 会按此与你互动…">' + persona + '</textarea>', function () {
+      persona = D.getElementById('personaTa').value;
+      toast(persona ? '人设已保存' : '人设已清空');
+    });
+  }
+  function openMoreMenu() {
+    openSheet('更多操作',
+      '<div class="sheet-item" data-more="export">导出聊天记录</div>' +
+      '<div class="sheet-item" data-more="bg">更换聊天背景</div>' +
+      '<div class="sheet-item" data-more="clear">清空记忆</div>');
+    D.getElementById('popupBody').querySelectorAll('[data-more]').forEach(function (it) {
+      it.onclick = function () {
+        var k = it.getAttribute('data-more');
+        closeSheet();
+        toast(k === 'export' ? '聊天记录已导出（沙盒演示）' : k === 'bg' ? '背景已更换（沙盒演示）' : '记忆已清空（沙盒演示）');
+      };
+    });
+  }
+
+  /* ══ 初始消息（与真实开局一致：纯气泡，无自带状态栏） ══ */
+  addMsg('ai', '<p>欢迎来到聊天～这里的样式与真实页面一致，开局就是普通气泡。</p>', true);
+  addMsg('self', '状态栏在哪里？', true);
+  addMsg('ai', '<p>状态栏不是页面自带的哦——它由作者卡的正则/提示词驱动。在「对话设置」里开启「自动状态栏」即可模拟这种效果。</p>', true);
+  scrollBottom();
+
+  /* ══ 沙盒 API ══ */
+  window.WBSandbox = {
+    sendUserMsg: function (t) { input.value = t; send(); },
+    addAiMsg: function (html, withStatus) { addMsg('ai', html + (withStatus || chatSets.statusbar ? statusBar() : '')); },
+    setStatusbar: function (on) { chatSets.statusbar = !!on; },
+    resetStats: function () { stats = { love: 43, energy: 85 }; },
+    toast: toast,
+    version: '3.1-real-opening'
+  };
+  console.log('[sandbox] v3 移动端 1:1 复刻环境已就绪（rem 缩放 + 全按钮可用）');
+})();
+</script>
+</uni-page-body></uni-page></uni-app>
+</body>
+</html>

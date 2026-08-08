@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>sexyai.ai 结构 Mock（壳页面）</title>
+<style>
+  html,body{margin:0;height:100%;background:#0d0a14;color:#cfc6e0;font:13px "Segoe UI",sans-serif}
+  .shell-bar{height:40px;display:flex;align-items:center;padding:0 16px;background:#171226;border-bottom:1px solid #2c2244}
+  .shell-bar b{color:#c084fc}
+  .chat-iframe{width:100%;height:calc(100% - 40px);border:0;display:block}
+</style>
+</head>
+<body>
+<div class="shell-bar"><b>sexyai.ai Mock</b>&nbsp;| 双层 iframe 架构复刻 · roleId=204786</div>
+<!-- 复刻：顶层壳 → 同源 chatIframe（sandbox 与真实站点一致，附带 token 参数）
+     hash 段模拟真实站点的 #/chat/chat 路由（包内脚本以此判断激活） -->
+<iframe id="chatIframe" class="chat-iframe"
+        src="mock-chat.html?roleId=204786&token=iframe_mock_token_abc123#/chat/chat"
+        sandbox="allow-scripts allow-same-origin allow-top-navigation allow-downloads allow-modals"></iframe>
+<script>
+  // 模拟站点存储中的 token 候选（供 TokenProbe 扫描）
+  try { localStorage.setItem('user_token', 'mock_top_token_xyz789'); } catch (e) {}
+</script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+{
+  "version": "0.1.0",
+  "target": "https://sexyai.ai",
+  "calibratedAt": "2026-08-05",
+  "note": "scope=chatIframe 表示选择器位于 #chatIframe 的 contentDocument 内；scope=top 表示顶层文档",
+  "regions": [
+    {
+      "key": "chat_iframe",
+      "name": "聊天应用 iframe（壳→应用入口）",
+      "selector": "#chatIframe",
+      "scope": "top",
+      "stability": "high",
+      "note": "双层架构入口，所有 chatIframe 内操作的前提"
+    },
+    {
+      "key": "scroll_container",
+      "name": "消息滚动容器",
+      "selector": "#scrollview .uni-scroll-view-content",
+      "scope": "chatIframe",
+      "stability": "high",
+      "note": "uni-scroll-view#scrollview.scroll-view.dark 内部"
+    },
+    {
+      "key": "msg_list",
+      "name": "消息列表",
+      "selector": ".chat-body#msglistview",
+      "scope": "chatIframe",
+      "stability": "high",
+      "note": "消息父容器，带 id"
+    },
+    {
+      "key": "msg_item",
+      "name": "单条消息",
+      "selector": ".chat-body .item",
+      "scope": "chatIframe",
+      "stability": "medium",
+      "note": "每条消息一个 .item，内部 .touch-scope#item{N}"
+    },
+    {
+      "key": "ai_bubble",
+      "name": "AI 消息气泡",
+      "selector": ".item.Ai .content.left",
+      "scope": "chatIframe",
+      "stability": "high",
+      "note": "气泡 id 形如 q-{msgId}"
+    },
+    {
+      "key": "self_bubble",
+      "name": "用户消息气泡",
+      "selector": ".item.self .right",
+      "scope": "chatIframe",
+      "stability": "medium",
+      "note": "由 CSS 规则确认，扫描时页面无实例"
+    },
+    {
+      "key": "ai_richtext",
+      "name": "AI 富文本渲染区（状态栏挂载点）",
+      "selector": ".content.left .tavern-sandbox",
+      "scope": "chatIframe",
+      "stability": "high",
+      "note": "AI 回复 HTML 内联渲染容器，SillyTavern 风格兼容"
+    },
+    {
+      "key": "input_real",
+      "name": "真实输入框（展开态）",
+      "selector": ".chat-input-scope uni-textarea.chatMsgTextarea textarea",
+      "scope": "chatIframe",
+      "stability": "medium",
+      "note": "默认折叠，需先点击折叠区展开"
+    },
+    {
+      "key": "input_collapsed",
+      "name": "输入区折叠预览",
+      "selector": ".chat-input-collapsed-display",
+      "scope": "chatIframe",
+      "stability": "medium",
+      "note": "点击后展开真实输入框"
+    },
+    {
+      "key": "send_btn",
+      "name": "发送按钮",
+      "selector": ".chat-input-bottom-row .btn-icon",
+      "scope": "chatIframe",
+      "stability": "medium",
+      "note": "另有隐藏 .chat-send-proxy 可编程入口，默认禁用"
+    }
+  ],
+  "fallbackChains": {
+    "ai_bubble": [".item.Ai .content.left", ".item.Ai", "[id^=q-]"],
+    "msg_list": [".chat-body#msglistview", "#msglistview", ".chat-body"],
+    "input_real": [".chat-input-scope textarea", ".chatMsgTextarea textarea", "textarea.uni-textarea-textarea"]
+  }
+}
