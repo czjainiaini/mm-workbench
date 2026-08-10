@@ -37,6 +37,50 @@ set PORT=9000 && node server.js   # Windows
 
 **访问地址**：<http://localhost:8793/wb/workbench.html>
 
+## 🔄 如何更新到新版本
+
+**当初用 git clone 下载的**：进入项目文件夹执行一条命令即可：
+
+```bash
+git pull
+```
+
+**当初下载 ZIP 解压的**：重新到仓库页面下载最新 ZIP，解压覆盖旧文件夹即可。
+不用担心丢东西：你的配色/组件/素材/AI 档案等配置都存在浏览器本地，不在项目文件里；覆盖后双击启动脚本照常用。
+
+## 🛠 Git 使用小抄（想参与开发/自己管理版本看这里）
+
+**第一次获取代码**：
+
+```bash
+git clone https://github.com/czjainiaini/mm-workbench.git
+cd mm-workbench
+```
+
+**日常更新**：`git pull`（拉取远程最新提交）。
+
+**改了代码想提交**：
+
+```bash
+git add -A
+git commit -m "一句话说明改了什么"
+git push        # 需要仓库写权限；fork 用户向自己仓库 push 后提 PR
+```
+
+**常用命令速查**：
+
+| 想做什么 | 命令 |
+|---|---|
+| 看当前改了什么 | `git status` / `git diff` |
+| 看提交历史 | `git log --oneline` |
+| 撤销未提交的修改 | `git checkout -- 文件名` |
+| 回到某个历史版本看看 | `git checkout 提交号`（看完 `git checkout main` 回来） |
+| pull 时提示冲突 | 先 `git stash` 暂存自己的改动，pull 后 `git stash pop` |
+
+**Windows 小提示**：提交信息含中文时若乱码，在终端先执行 `chcp 65001` 再提交；或把提交信息存成 UTF-8 文本文件后用 `git commit -F 文件名`。
+
+**注意事项**：仓库 .gitignore 已排除截图、第三方参考美化包等本地私有内容，`git status` 里看不到它们是正常的，不要强行添加。
+
 ## 📖 新手三步上手
 
 1. 工作台上方「沙盒」下拉选 **真站·聊天页**（第一次需在沙盒里登录一次），等右上角徽章变「已加载」
