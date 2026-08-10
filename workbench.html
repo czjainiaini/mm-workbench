@@ -638,6 +638,9 @@ const bridgeLoaded = Promise.all([
   fetchFirst(['/wb/src/publisher.js', '/wb/publisher.js', '/src/publisher.js'])
 ]).then(([b, l, p]) => { bridgeCode = b; loaderCode = l; publisherCode = p; });
 
+/* 安全探测：iframe 处于 about:blank/加载中时 origin 为 null，读属性会抛 SecurityError，不应当作故障 */
+function probeWin(w, key) { try { return !!w[key]; } catch (e) { return false; } }
+
 async function injectBridge() {
   if (!MODE) return; // 空沙盒不处理
   try {
@@ -647,21 +650,21 @@ async function injectBridge() {
     $('#sandbox-tip').style.display = 'none';
     if (MODE === 'local') {
       // 本地复刻：同源直接 eval 注入
-      if (!w.__WB_BRIDGE__) {
+      if (!probeWin(w, '__WB_BRIDGE__')) {
         try { w.eval(bridgeCode); if (loaderCode) w.eval(loaderCode); } catch (e) {}
       }
     } else if (MODE === 'external') {
       await new Promise(r => setTimeout(r, 600)); // 外部站点无桥，仅等待嵌入
     } else {
-      // 真实站点/自定义 sexyai 页：服务器已在每个 HTML 响应里注入桥，轮询等待就绪
+      // 真实站点/自定义 sexyai 页：服务器已在每个 HTML 响应里注入桥，轮询等待就绪（加载中窗口安全探测）
       let waited = 0;
-      while (!w.__WB_BRIDGE__ && waited < 9000) {
+      while (!probeWin(w, '__WB_BRIDGE__') && waited < 9000) {
         await new Promise(r => setTimeout(r, 400)); waited += 400;
       }
     }
     // 发布模块补注入（服务器注入列表未生效时兑底）
-    if (publisherCode && !w.MMPublish && MODE !== 'external') { try { w.eval(publisherCode); } catch (e) {} }
-    const okB = !!w.__WB_BRIDGE__;
+    if (publisherCode && !probeWin(w, 'MMPublish') && MODE !== 'external') { try { w.eval(publisherCode); } catch (e) {} }
+    const okB = probeWin(w, '__WB_BRIDGE__');
     sbReady = okB;
     if (MODE === 'external') {
       $('#badge').textContent = '已嵌入'; $('#badge').className = '';
@@ -683,8 +686,14 @@ async function injectBridge() {
     setTimeout(() => runHealth(true), 700);
   } catch (e) {
     sbReady = false;
-    $('#badge').textContent = '沙盒不可达'; $('#badge').className = 'bad';
-    term('k-err', '桥初始化失败: ' + e.message);
+    const msg = String(e.message || '');
+    if (/cross-origin|named property|blocked a frame/i.test(msg)) {
+      // 加载中的正常状态：页面还没载入完成，不是故障
+      term('k-net', '沙盒页面加载中（未就绪），稍等片刻；若长时间无响应点 ⟳ 刷新');
+    } else {
+      $('#badge').textContent = '沙盒不可达'; $('#badge').className = 'bad';
+      term('k-err', '桥初始化失败: ' + msg);
+    }
   }
 }
 sb.addEventListener('load', injectBridge);
