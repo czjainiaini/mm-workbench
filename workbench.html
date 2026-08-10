@@ -378,7 +378,7 @@
           <span>设备</span>
           <select id="dev-width"><option value="412">手机 412px</option><option value="540">大屏手机 540px</option><option value="768">平板 768px</option><option value="1080">全宽</option></select>
           <span id="dev-orient" style="flex-shrink:0">竖屏 📱</span>
-          <span id="dev-note">真实站点页面（整端口代理同源化）· 未登录请先在沙盒内登录</span>
+          <span id="dev-note">真实站点页面（整端口代理同源化）· 未登录点「新页打开」在独立页登录后回来刷新</span>
         </div>
       </div>
       <div id="stage">
@@ -553,7 +553,7 @@ if ('serviceWorker' in navigator) {
 
 /* ════════ 沙盒模式（真聊天页 / 真创作界面 / 本地复刻） ════════ */
 const MODES = {
-  chat:   { base: '/', hash: '#/pages/chat/chat?roleId=204786&prePath=1', note: '真实站点聊天页（整端口代理同源化）· 未登录请先在沙盒内登录' },
+  chat:   { base: '/', hash: '#/pages/chat/chat?roleId=204786&prePath=1', note: '真实站点聊天页（整端口代理同源化）· 未登录点「新页打开」登录' },
   create: { base: '/', hash: '#/pages/role/create?id=204786', note: '真实站点创作界面（正则/世界书/开场白编辑页）' },
   local:  { base: '/wb/mock/mock-chat.html', hash: '#/chat/chat', note: '本地复刻聊天环境 · 完全离线' }
 };
@@ -2056,7 +2056,7 @@ function runHealth(silent) {
     const doc = (() => { try { return w && w.document; } catch (e) { return null; } })();
     const chatDoc = (() => { try { return doc && doc.getElementById('chatIframe') && doc.getElementById('chatIframe').contentDocument; } catch (e) { return null; } })();
 
-    if (!w || !w.__WB_BRIDGE__) checks.push({ lv: 'red', txt: '沙盒桥未注入，实时编辑不可用（可能在登录页，登录后点刷新）', fix: () => { loadSandbox(true); return '已重载沙盒，等待桥重新注入'; } });
+    if (!w || !w.__WB_BRIDGE__) checks.push({ lv: 'red', txt: '沙盒桥未注入，实时编辑不可用（可能在登录页：点「新页打开」登录后回来刷新）', fix: () => { loadSandbox(true); return '已重载沙盒，等待桥重新注入'; } });
     else checks.push({ lv: 'green', txt: '注入桥已就位，CSS/JS 可直达沙盒', fix: null });
 
     const chatIfr = doc && doc.getElementById('chatIframe');
@@ -2071,9 +2071,9 @@ function runHealth(silent) {
       if (pkgCount === 0) checks.push({ lv: 'gray', txt: '尚未装载任何美化包（可在「插槽/导出」页签导出自己的包后装载）', fix: () => { const p = makePlan('装载美化包'); if (p) p.run(); return '已发起装载（若 package.json 为空，先粘贴导出 JSON）'; } });
     } else if (MODE === 'create') {
       if (doc && doc.querySelectorAll('textarea,input').length >= 2) checks.push({ lv: 'green', txt: '创作界面就绪（正则/世界书/开场白编辑区可直接操作）', fix: null });
-      else checks.push({ lv: 'red', txt: '创作界面未加载完成（若跳到登录页，请先在沙盒内登录）', fix: () => { loadSandbox(true); return '已重载沙盒'; } });
+      else checks.push({ lv: 'red', txt: '创作界面未加载完成（若跳到登录页：人机验证在沙盒小窗里过不了，点「新页打开」在独立页面登录后回来刷新，登录态自动共享）', fix: async () => { window.open(await modeUrl(false), '_blank'); return '已在新标签页打开站点：登录后回工作台点 ⟳ 刷新'; } });
     } else {
-      checks.push({ lv: 'red', txt: '沙盒内未找到消息列表（可能未加载完成或在登录页）', fix: () => { loadSandbox(true); return '已重载沙盒'; } });
+      checks.push({ lv: 'red', txt: '沙盒内未找到消息列表（多半在登录页：人机验证在沙盒小窗里过不了，点右侧按钮在独立页面登录，登录态同域自动共享）', fix: async () => { window.open(await modeUrl(false), '_blank'); return '已在新标签页打开站点：登录后回工作台点 ⟳ 刷新'; } });
     }
     checks.push({ lv: MODE === 'local' ? 'green' : 'gray', txt: MODE === 'local' ? '本地沙盒离线可用：不依赖目标网站，永不失效' : '当前为真实站点模式：改动实时生效于真页面，刷新即还原', fix: null });
 
@@ -2866,7 +2866,8 @@ const HELP_DOCS = {
     '<h4>💾 数据存在哪</h4><div>所有配置（组件/素材/插槽/档案）都存在你自己浏览器的本地存储里（localStorage——就是浏览器帮你记东西的小仓库），换浏览器或清缓存会重置。</div>',
   faq:
     '<h4>常见问题</h4>' +
-    '<div class="hd-row"><span class="hd-q">沙盒是空白？</span><span class="hd-a">上方「沙盒」下拉选一个模式（推荐 真站·聊天页）；真站模式第一次可能要在沙盒里重新登录。</span></div>' +
+    '<div class="hd-row"><span class="hd-q">沙盒是空白？</span><span class="hd-a">上方「沙盒」下拉选一个模式（推荐 真站·聊天页）；真站模式第一次需要登录，见下一条。</span></div>' +
+    '<div class="hd-row"><span class="hd-q">沙盒里登录不了/人机验证失败？</span><span class="hd-a">登录页的人机验证（Cloudflare Turnstile）在沙盒嵌套窗口里无法通过，这不是你的问题。解决：点工具条「↗ 新页打开」（或浏览器直接访问 http://localhost:8793/）在独立页面登录，再回工作台点 ⟳ 刷新——两边是同一个源，登录态自动共享。</span></div>' +
     '<div class="hd-row"><span class="hd-q">样式没生效？</span><span class="hd-a">等徽章显示「已加载」再操作；或点工具条 ⟳ 刷新沙盒后重试。</span></div>' +
     '<div class="hd-row"><span class="hd-q">怎么恢复原界面？</span><span class="hd-a">快捷面板「🧹 清除效果」一键还原；组件页还有「清除全部效果」。</span></div>' +
     '<div class="hd-row"><span class="hd-q">改错了想反悔？</span><span class="hd-a">点选编辑有「↩ 撤销」（最多 30 步）；组件页「👀 前后对比」可临时查看修改前。</span></div>' +
