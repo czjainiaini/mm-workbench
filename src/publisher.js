@@ -23,6 +23,9 @@
     }).then(function (r) { return r.json(); });
   }
   function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function savedRulesNotice(results) {
+    return results.length ? '；已成功写入 ' + results.length + ' 条规则，本次操作不是事务，请核对后重试（同名规则会更新）' : '';
+  }
 
   window.MMPublish = {
     LIMITS: { name: 20, regex: 1000, content: 20000 },
@@ -102,6 +105,8 @@
      * 卡片字段（statusbar/beginning/pageDepth）：整卡 query→merge→save
      */
     async publishPackage(pkgJson, roleId) {
+      roleId = Number(roleId);
+      if (!Number.isSafeInteger(roleId) || roleId <= 0) throw new Error('角色 ID 必须是正整数');
       const norm = this.normalizePackage(pkgJson);
       const rules = this.prepareRules(norm, roleId);
       const before = await this.listRegexp(roleId);
@@ -109,15 +114,19 @@
       for (const rule of rules) {
         const existed = before.find(function (b) { return b.name === rule.name; });
         const payload = existed ? Object.assign({ id: existed.id }, rule) : rule;
-        const s = await post('/api/role/regexp/save', [payload]);
-        if (s.code !== 200) throw new Error('保存失败(' + rule.name + '): ' + (s.message || ''));
+        const s = await post('/api/role/regexp/save', [payload]).catch(function (e) {
+          throw new Error('保存失败(' + rule.name + '): ' + e.message + savedRulesNotice(results));
+        });
+        if (s.code !== 200) throw new Error('保存失败(' + rule.name + '): ' + (s.message || '') + savedRulesNotice(results));
         results.push({ name: rule.name, id: s.data && s.data.id, updated: !!existed });
         await wait(350); // 防 429
       }
       let cardUpdated = false;
       const hasCardFields = !!norm.statusbar || !!norm.beginning || norm.pageDepth != null;
       if (hasCardFields) {
-        const card = await this.queryRole(roleId);
+        const card = await this.queryRole(roleId).catch(function (e) {
+          throw new Error(e.message + savedRulesNotice(results));
+        });
         const merged = Object.assign({}, card);
         // 分类兑底：实测卡片 categoryId=0 会被服务端拒（角色分类不存在）
         if (!merged.categoryId) merged.categoryId = 1;
@@ -126,22 +135,30 @@
         if (norm.statusbar) merged.statusbar = norm.statusbar;
         if (norm.beginning) merged.beginning = norm.beginning;
         if (norm.pageDepth != null) merged.pageDepth = norm.pageDepth;
-        let s2 = await post('/api/role/save', merged);
+        let s2 = await post('/api/role/save', merged).catch(function (e) {
+          throw new Error('卡片字段保存失败: ' + e.message + savedRulesNotice(results));
+        });
         // 分类兑底：分类 ID 不连续（实测无 1），报错时动态取有效分类重试
         if (s2.code !== 200 && /分类/.test(s2.message || '')) {
-          const cats = await post('/api/role/category/list', {});
+          const cats = await post('/api/role/category/list', {}).catch(function (e) {
+            throw new Error('读取角色分类失败: ' + e.message + savedRulesNotice(results));
+          });
           const arr = Array.isArray(cats.data) ? cats.data : (cats.data && cats.data.list) || [];
           const valid = arr.find(function (c) { return c.id != null; });
           if (valid) {
             merged.categoryId = valid.id;
             merged.categoryIds = [valid.id];
-            s2 = await post('/api/role/save', merged);
+            s2 = await post('/api/role/save', merged).catch(function (e) {
+              throw new Error('卡片字段重试失败: ' + e.message + savedRulesNotice(results));
+            });
           }
         }
-        if (s2.code !== 200) throw new Error('卡片字段保存失败: ' + (s2.message || ''));
+        if (s2.code !== 200) throw new Error('卡片字段保存失败: ' + (s2.message || '') + savedRulesNotice(results));
         cardUpdated = true;
       }
-      const after = await this.listRegexp(roleId);
+      const after = await this.listRegexp(roleId).catch(function (e) {
+        throw new Error('写入后回读失败: ' + e.message + savedRulesNotice(results));
+      });
       return { ok: true, rules: results, cardUpdated: cardUpdated, beforeCount: before.length, afterCount: after.length };
     }
   };

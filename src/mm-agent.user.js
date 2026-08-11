@@ -5,6 +5,8 @@
 // @description  sexyai.ai 可视化编程 Agent：ocs 三层执行架构 + 区域注册表 + 快照/Diff/回滚 + 守卫
 // @match        https://sexyai.ai/*
 // @match        http://localhost:8787/*
+// @match        http://localhost:8793/*
+// @match        http://127.0.0.1:8793/*
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==

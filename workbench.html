@@ -369,6 +369,9 @@
             <option value="create">真站·创作界面</option>
             <option value="local">本地复刻·离线</option>
           </select>
+          <label title="用于聊天/创作预览与发布；默认保留原角色 204786" style="display:flex;align-items:center;gap:4px;flex-shrink:0">角色 ID
+            <input id="role-id" value="204786" inputmode="numeric" pattern="[0-9]+" aria-label="角色 ID" style="width:72px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:2px 6px;font-size:11px">
+          </label>
           <input id="sb-custom-url" placeholder="或粘贴任意网址（通用模式）" style="background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:2px 8px;font-size:11px">
           <button id="btn-open-url" style="font-size:11px;padding:3px 8px;flex-shrink:0">打开</button>
                   <button id="btn-region-inspect" style="font-size:11px;padding:3px 8px;flex-shrink:0" title="开启后鼠标悬停沙盒可看区域名称，点击区域可打开其样式模板"><svg class="ic"><use href="#i-search"/></svg> 区域标注</button>
@@ -545,6 +548,16 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 window.esc = esc;
 const tstr = () => new Date().toTimeString().slice(0, 8);
 function stLast(txt) { $('#st-last').textContent = '最近操作: ' + txt; }
+const DEFAULT_ROLE_ID = '204786';
+const ROLE_ID_STORE = 'wb-role-id';
+function normalizeRoleId(value) {
+  const text = String(value || '').trim();
+  const number = Number(text);
+  return /^\d+$/.test(text) && Number.isSafeInteger(number) && number > 0 ? String(number) : '';
+}
+function currentRoleId() {
+  return normalizeRoleId(localStorage.getItem(ROLE_ID_STORE)) || DEFAULT_ROLE_ID;
+}
 
 /* ════════ Service Worker ════════ */
 if ('serviceWorker' in navigator) {
@@ -553,11 +566,27 @@ if ('serviceWorker' in navigator) {
 
 /* ════════ 沙盒模式（真聊天页 / 真创作界面 / 本地复刻） ════════ */
 const MODES = {
-  chat:   { base: '/', hash: '#/pages/chat/chat?roleId=204786&prePath=1', note: '真实站点聊天页（整端口代理同源化）· 未登录点「新页打开」登录' },
-  create: { base: '/', hash: '#/pages/role/create?id=204786', note: '真实站点创作界面（正则/世界书/开场白编辑页）' },
+  chat:   { base: '/', hash: () => '#/pages/chat/chat?roleId=' + currentRoleId() + '&prePath=1', note: '真实站点聊天页（整端口代理同源化）· 未登录点「新页打开」登录' },
+  create: { base: '/', hash: () => '#/pages/role/create?id=' + currentRoleId(), note: '真实站点创作界面（正则/世界书/开场白编辑页）' },
   local:  { base: '/wb/mock/mock-chat.html', hash: '#/chat/chat', note: '本地复刻聊天环境 · 完全离线' }
 };
 let MODE = '';
+const roleIdInput = $('#role-id');
+roleIdInput.value = currentRoleId();
+roleIdInput.onchange = () => {
+  const previous = currentRoleId();
+  const next = normalizeRoleId(roleIdInput.value);
+  if (!next) {
+    roleIdInput.value = previous;
+    term('k-err', '角色 ID 必须是正整数');
+    return;
+  }
+  localStorage.setItem(ROLE_ID_STORE, next);
+  roleIdInput.value = next;
+  term('k-cmd', '角色 ID → ' + next);
+  stLast('切换角色 ' + next);
+  if (next !== previous && (MODE === 'chat' || MODE === 'create')) loadSandbox(false);
+};
 let localBaseCache = null;
 async function resolveLocalBase() {
   if (localBaseCache) return localBaseCache;
@@ -580,7 +609,8 @@ async function modeUrl(cacheBust) {
   }
   const m = MODES[MODE];
   const base = MODE === 'local' ? await resolveLocalBase() : m.base;
-  return base + (cacheBust ? (base.indexOf('?') >= 0 ? '&' : '?') + '_t=' + Date.now() : '') + m.hash;
+  const hash = typeof m.hash === 'function' ? m.hash() : m.hash;
+  return base + (cacheBust ? (base.indexOf('?') >= 0 ? '&' : '?') + '_t=' + Date.now() : '') + hash;
 }
 async function loadSandbox(cacheBust) {
   sbReady = false;
@@ -1206,14 +1236,14 @@ function restoreRunFn(entry) {
 /* ---- 执行权限模式 / 显示模式 / 高危判定 ---- */
 function runMode() { return localStorage.getItem('wb-run-mode') || 'review'; }
 function aiVerbose() { return localStorage.getItem('wb-ai-verbose') !== '0'; }
-function isHighRiskAction(a) { return a && (a.type === 'publish' || a.type === 'clear_css'); }
+function isHighRiskAction(a) { return a && ['run_js', 'js', 'load_package', 'publish', 'clear_css'].includes(a.type); }
 function actionMeta(a) {
   const icons = { apply_theme: '🎨', apply_css: '🎯', css: '🎯', run_js: '⚙️', js: '⚙️', load_package: '📦', publish: '🚀', clear_css: '🧹', none: '💬' };
   let impact = '';
   if (a.type === 'apply_theme') impact = '影响范围：全位置注册表 ' + ((window.MM_REGISTRY || {}).entries || []).length + ' 个区域全量换色（背景/顶栏/气泡/弹窗/输入区等）';
   else if (a.type === 'apply_css' || a.type === 'css') { const n = (String(a.content || '').match(/[^{}]+\{/g) || []).length; impact = '影响范围：向沙盒注入 ' + n + ' 组 CSS 规则（实时生效，可清除）'; }
-  else if (a.type === 'run_js' || a.type === 'js') impact = '影响范围：在沙盒聊天页执行脚本（可能改动页面内容/行为）';
-  else if (a.type === 'load_package') impact = '影响范围：将 package.json 美化包装载进沙盒';
+  else if (a.type === 'run_js' || a.type === 'js') impact = '⚠ 高风险：将在沙盒聊天页执行脚本（可能改动页面内容/行为）';
+  else if (a.type === 'load_package') impact = '⚠ 高风险：将装载 package.json（其中可能包含可执行脚本）';
   else if (a.type === 'publish') impact = '⚠ 高风险：此操作将写入线上角色卡，影响所有使用该卡的用户';
   else if (a.type === 'clear_css') impact = '⚠ 高风险：将清除全部注入的美化样式，沙盒回到原始外观';
   return { icon: icons[a.type] || '•', risky: isHighRiskAction(a), impact };
@@ -1260,7 +1290,11 @@ function renderPlanCard(entry, liveRunFn) {
           b.style.cssText = 'margin-top:5px;padding:1px 8px;font-size:10.5px';
           b.onclick = async () => {
             b.disabled = true; setRowState(i, '执行中…');
-            try { await runAgentActions([a]); setRowState(i, '✓ 完成'); }
+            try {
+              const result = (await runAgentActions([a]))[0];
+              if (!result || !result.ok) throw new Error((result && result.detail) || '动作未完成');
+              setRowState(i, '✓ 完成');
+            }
             catch (e) { setRowState(i, '✗ ' + e.message); b.disabled = false; }
           };
           row.appendChild(b);
@@ -1542,7 +1576,8 @@ async function publishCurrentPackage() {
     currentFile = 'package.json'; openInEditor('package.json');
     throw new Error('请先在 package.json 粘贴功能栏导出 JSON');
   }
-  const r = await w.MMPublish.publishPackage(raw, 204786);
+  const roleId = Number(currentRoleId());
+  const r = await w.MMPublish.publishPackage(raw, roleId);
   addHistory('发布到角色卡', r.rules.map((x) => x.name + (x.updated ? '(更新)' : '(新增)')).join('\n'));
   term('k-ok', '发布完成：' + r.rules.length + ' 条规则' + (r.cardUpdated ? ' + 卡片字段' : ''));
   stLast('发布到角色卡');
@@ -1603,7 +1638,7 @@ function makePlan(text) {
     } };
   }
   if (/发布|写入|同步|publish/.test(t)) {
-    return { title: '发布美化包到角色卡(204786)', steps: ['读取 package.json（功能栏导出格式）', '正则规则：同名更新、其余追加（不会误删已有规则）', 'statusbar/开场白等卡片字段：整卡读取→合并→保存', '每条间隔 350ms 防限流'], run: () => publishCurrentPackage() };
+    return { title: '发布美化包到角色卡(' + currentRoleId() + ')', steps: ['读取 package.json（功能栏导出格式）', '正则规则：同名更新、其余追加（不会误删已有规则）', 'statusbar/开场白等卡片字段：整卡读取→合并→保存', '每条间隔 350ms 防限流'], run: () => publishCurrentPackage() };
   }
   if (/清除|还原|重置|恢复/.test(t)) {
     return { title: '清除全部注入', steps: ['清空实时样式节点', '（脚本类注入建议刷新沙盒彻底还原）'], run: () => {
@@ -1757,7 +1792,7 @@ $('#llm-fetch').onclick = async () => {
     });
     const j = await r.json();
     if (j.error) throw new Error(j.error.message || JSON.stringify(j.error).slice(0, 100));
-    const list = (j.data || []).map((m) => m.id || m.name).filter(Boolean);
+    const list = (j.data || []).map((m) => m.id || m.name).filter(Boolean).map(String);
     window.__llmModels = list;
     renderModelList();
     msg.textContent = '✓ 获取 ' + list.length + ' 个模型（点击下方列表选择）';
@@ -1775,11 +1810,25 @@ $('#llm-fetch').onclick = async () => {
 function renderModelList() {
   const box = $('#llm-models-box');
   const list = window.__llmModels || [];
-  box.innerHTML = list.map((id) => '<div class="llm-model-item" data-m="' + id + '">' + id + '</div>').join('') || '<div class="llm-model-item" style="color:var(--dim)">无模型</div>';
+  box.textContent = '';
+  if (!list.length) {
+    const empty = document.createElement('div');
+    empty.className = 'llm-model-item';
+    empty.style.color = 'var(--dim)';
+    empty.textContent = '无模型';
+    box.appendChild(empty);
+  } else {
+    list.forEach((rawId) => {
+      const id = String(rawId);
+      const item = document.createElement('div');
+      item.className = 'llm-model-item';
+      item.dataset.m = id;
+      item.textContent = id;
+      item.onclick = () => { $('#llm-model').value = id; box.style.display = 'none'; };
+      box.appendChild(item);
+    });
+  }
   box.style.display = 'block';
-  box.querySelectorAll('[data-m]').forEach((it) => {
-    it.onclick = () => { $('#llm-model').value = it.dataset.m; box.style.display = 'none'; };
-  });
 }
 $('#llm-model').addEventListener('focus', () => { if ((window.__llmModels || []).length) $('#llm-models-box').style.display = 'block'; });
 const LLM_SYSTEM = '你是魅魔工作台的可视化编程 Agent，通过结构化动作修改沙盒聊天页。只输出严格 JSON（禁代码块标记）：{"reply":"中文回复","actions":[{"type":"...","content":"...","palette":{}}]}。actions.type：apply_theme（配色/主题类首选，给 palette:{bg,surface,accent,text,self} 十六进制，系统生成全区域 CSS，勿自写配色 CSS）、apply_css（局部样式，content 为完整 CSS，用快照提供的真实类名+!important）、run_js（聊天页执行的 JS）、load_package（装载 package.json，无 content）、publish（发布 package.json 到角色卡，无 content）、clear_css（清除注入样式）、none（纯聊天）。多动作按序执行。回复简洁。';
@@ -1868,6 +1917,11 @@ async function executeAgentPlan(text, actions) {
     }
     if (!fix.actions.length) {
       entry.rows.push({ s: '⚠️', t: '模型修正', d: '模型未给出修正动作，请检查沙盒是否已加载页面' });
+      renderProgressCard(entry);
+      break;
+    }
+    if (fix.actions.some(isHighRiskAction)) {
+      entry.rows.push({ s: '⚠️', t: '模型修正', d: '修正方案包含脚本/装包/发布等高风险动作，已停止自动执行，请重新确认新方案' });
       renderProgressCard(entry);
       break;
     }

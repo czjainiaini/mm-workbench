@@ -5,12 +5,20 @@
  * ============================================================ */
 const http = require('http');
 const https = require('https');
+const { lookup } = require('dns/promises');
 const { readFile } = require('fs/promises');
-const { join, extname } = require('path');
+const { join, resolve, relative, isAbsolute, extname } = require('path');
+const { isIP } = require('net');
 
 const ROOT = __dirname;
-const PORT = process.env.PORT || 8787;
+const PORT = Number(process.env.PORT || 8793);
+const LOOPBACK_HOST = '127.0.0.1';
 const TARGET_HOST = 'sexyai.ai';
+const MAX_LLM_BODY = 1024 * 1024;
+
+if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
+  throw new Error('PORT 必须是 1-65535 的整数');
+}
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -78,8 +86,15 @@ function proxyToSite(req, res, targetPath) {
 /* ---------- 静态文件（/wb/ 命名空间，找不到时报 404） ---------- */
 async function serveStatic(req, res, urlPath) {
   if (urlPath === '/wb' || urlPath === '/wb/') urlPath = '/wb/workbench.html';
-  const filePath = join(ROOT, urlPath.slice(4)); // 去掉 /wb 前缀映射到工作区根
-  if (!filePath.startsWith(ROOT)) { res.statusCode = 403; return res.end('403'); }
+  let requestedPath;
+  try { requestedPath = decodeURIComponent(urlPath.slice(4)); }
+  catch (e) { res.statusCode = 400; return res.end('400'); }
+  const filePath = resolve(ROOT, requestedPath); // 去掉 /wb 前缀映射到工作区根
+  const relativePath = relative(ROOT, filePath);
+  if (relativePath === '..' || relativePath.startsWith('..\\') || relativePath.startsWith('../') || isAbsolute(relativePath)) {
+    res.statusCode = 403;
+    return res.end('403');
+  }
   try {
     const data = await readFile(filePath);
     res.setHeader('Content-Type', TYPES[extname(filePath)] || 'application/octet-stream');
@@ -91,22 +106,79 @@ async function serveStatic(req, res, urlPath) {
 }
 
 /* ---------- LLM 中继（解决浏览器直连模型 API 的 CORS 限制） ---------- */
+function isBlockedAddress(address) {
+  const normalized = String(address).replace(/^::ffff:/i, '').toLowerCase();
+  if (isIP(normalized) === 4) {
+    const parts = normalized.split('.').map(Number);
+    const a = parts[0]; const b = parts[1];
+    return a === 0 || a === 10 || a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 198 && (b === 18 || b === 19)) ||
+      a >= 224;
+  }
+  if (isIP(normalized) === 6) {
+    return normalized === '::' || normalized === '::1' ||
+      normalized.startsWith('fc') || normalized.startsWith('fd') ||
+      /^fe[89a-f]/.test(normalized) || normalized.startsWith('ff');
+  }
+  return true;
+}
+
+async function resolvePublicTarget(baseUrl) {
+  let url;
+  try { url = new URL(baseUrl || 'https://api.hunyuan.cloud.tencent.com/v1'); }
+  catch (e) { throw new Error('bad baseUrl'); }
+  if (url.protocol !== 'https:' || url.username || url.password) throw new Error('baseUrl 仅支持无内嵌凭据的 HTTPS 地址');
+  const addresses = await lookup(url.hostname, { all: true, verbatim: true });
+  if (!addresses.length || addresses.some((item) => isBlockedAddress(item.address))) {
+    throw new Error('baseUrl 不允许指向本机、私网或保留地址');
+  }
+  return { url, address: addresses[0] };
+}
+
+function pinnedLookup(address) {
+  return function (_hostname, _options, callback) {
+    callback(null, address.address, address.family);
+  };
+}
+
 function relayLLM(req, res) {
+  if (req.method !== 'POST') {
+    res.statusCode = 405;
+    res.setHeader('Allow', 'POST');
+    return res.end('method not allowed');
+  }
   let body = '';
-  req.on('data', (c) => { body += c; });
-  req.on('end', () => {
+  let bodyBytes = 0;
+  let bodyTooLarge = false;
+  req.on('data', (c) => {
+    bodyBytes += c.length;
+    if (bodyBytes > MAX_LLM_BODY) {
+      bodyTooLarge = true;
+      return;
+    }
+    body += c;
+  });
+  req.on('end', async () => {
+    if (bodyTooLarge) { res.statusCode = 413; return res.end('payload too large'); }
     let cfg;
     try { cfg = JSON.parse(body); } catch (e) { res.statusCode = 400; return res.end('bad json'); }
-    let u;
-    try { u = new URL(cfg.baseUrl || 'https://api.hunyuan.cloud.tencent.com/v1'); } catch (e) { res.statusCode = 400; return res.end('bad baseUrl'); }
+    let target;
+    try { target = await resolvePublicTarget(cfg.baseUrl); }
+    catch (e) { res.statusCode = 400; return res.end(e.message); }
+    const u = target.url;
     const basePath = u.pathname.replace(/\/$/, '');
 
     /* 模型列表（OpenAI 兼容 GET /models） */
     if (cfg.action === 'models') {
       const rm = https.request({
-        hostname: u.hostname, port: 443,
+        hostname: u.hostname, port: u.port || 443,
         path: basePath + '/models', method: 'GET',
-        headers: { 'Authorization': 'Bearer ' + (cfg.apiKey || '') }
+        headers: { 'Authorization': 'Bearer ' + (cfg.apiKey || '') },
+        lookup: pinnedLookup(target.address)
       }, (pres) => {
         let out = '';
         pres.setEncoding('utf8');
@@ -130,9 +202,10 @@ function relayLLM(req, res) {
     });
     const r2 = https.request({
       hostname: u.hostname,
-      port: 443,
+      port: u.port || 443,
       path: basePath + '/chat/completions',
       method: 'POST',
+      lookup: pinnedLookup(target.address),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + (cfg.apiKey || ''),
@@ -155,10 +228,6 @@ function relayLLM(req, res) {
 }
 
 http.createServer((req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
-  if (req.method === 'OPTIONS') { res.statusCode = 204; return res.end(); }
-
   const noQuery = req.url.split('?')[0];
   if (noQuery === '/wb/api/llm') {
     return relayLLM(req, res);
@@ -176,4 +245,4 @@ http.createServer((req, res) => {
   // 其余一切路径 = 站点代理（整个端口就是站点沙盒，
   // 保证站点 JS 构建的任何相对/hash 地址都落在代理域内）
   proxyToSite(req, res, req.url);
-}).listen(PORT, () => console.log('workbench server @ http://localhost:' + PORT + '  (站点沙盒: /, 工作台: /wb/workbench.html)'));
+}).listen(PORT, LOOPBACK_HOST, () => console.log('workbench server @ http://' + LOOPBACK_HOST + ':' + PORT + '  (站点沙盒: /, 工作台: /wb/workbench.html)'));

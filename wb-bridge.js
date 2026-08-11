@@ -92,7 +92,7 @@
   }
   window.__wb_applyCss = function (css) {
     var g = throttled(__cssAt, __cssN); __cssAt = g.at; __cssN = g.n;
-    if (!g.ok) { reportError('[wb] CSS 注入过于频繁，已限流（5秒/20次）'); return 0; }
+    if (!g.ok) { window.__wb_reportError('[wb] CSS 注入过于频繁，已限流（5秒/20次）'); return 0; }
     var targets = [document, chatDoc()].filter(Boolean);
     targets.forEach(function (d) {
       var st = d.getElementById('wb-live-css');
@@ -110,7 +110,7 @@
 
   window.__wb_applyJs = function (code) {
     var g = throttled(__jsAt, __jsN); __jsAt = g.at; __jsN = g.n;
-    if (!g.ok) { reportError('[wb] JS 注入过于频繁，已限流（5秒/20次）'); return false; }
+    if (!g.ok) { window.__wb_reportError('[wb] JS 注入过于频繁，已限流（5秒/20次）'); return false; }
     var d = chatDoc() || document;
     var sc = d.createElement('script');
     sc.textContent = code;
