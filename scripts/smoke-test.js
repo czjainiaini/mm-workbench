@@ -61,7 +61,7 @@ function waitForServer(child) {
 }
 
 function verifySource() {
-  const jsFiles = ['server.js', 'wb-bridge.js', 'sw.js', 'src/loader.js', 'src/publisher.js', 'src/style-registry.js', 'src/mm-agent.user.js'];
+  const jsFiles = ['server.js', 'wb-bridge.js', 'sw.js', 'src/loader.js', 'src/publisher.js', 'src/project-studio.js', 'src/style-registry.js', 'src/mm-agent.user.js'];
   jsFiles.forEach((file) => {
     const result = spawnSync(process.execPath, ['--check', join(ROOT, file)], { encoding: 'utf8' });
     assert.equal(result.status, 0, file + ' syntax error:\n' + result.stderr);
@@ -75,9 +75,11 @@ function verifySource() {
   const ids = Array.from(markup.matchAll(/\sid="([^"]+)"/g), match => match[1]);
   const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
   assert.deepEqual(Array.from(new Set(duplicates)), [], 'HTML ids should be unique');
-  ['wb-theme', 'btn-style-undo', 'btn-style-redo', 'btn-style-compare', 'ob-action', 'data-ob-palette'].forEach(token => {
+  ['wb-theme', 'btn-style-undo', 'btn-style-redo', 'btn-style-compare', 'ob-action', 'data-ob-palette', 'view-project', 'llm-context', 'llm-auto-summary', 'llm-memory-details', 'wb-chat-sessions', 'memory.turns'].forEach(token => {
     assert.ok(html.includes(token), 'workbench should include ' + token);
   });
+  assert.ok(html.includes('真站·聊天页（推荐）'), 'real chat page should be the recommended mode');
+  assert.ok(!html.includes('本地复刻·离线（推荐）'), 'incomplete local clone must not be recommended');
 }
 
 async function main() {
@@ -101,6 +103,11 @@ async function main() {
     const svg = await request(port, '/wb/mock/site-assets/ico_aihelp.svg');
     assert.equal(svg.status, 200);
     assert.match(svg.headers['content-type'] || '', /^image\/svg\+xml/);
+
+    const projectStudio = await request(port, '/wb/src/project-studio.js');
+    assert.equal(projectStudio.status, 200);
+    assert.match(projectStudio.headers['content-type'] || '', /javascript/);
+    assert.ok(projectStudio.body.includes('wb-project-snapshots'));
 
     assert.equal((await request(port, '/wb/not-found.txt')).status, 404);
     assert.equal((await request(port, '/wb/%2e%2e/server.js')).status, 403);

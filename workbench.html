@@ -75,8 +75,8 @@
   /* ---- 中栏 ---- */
   #center{flex:1;display:flex;flex-direction:column;background:var(--panel-deep);min-width:360px}
   #ctabs{display:flex;align-items:center;gap:4px;padding:7px 12px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--center-from) 0%,var(--panel) 100%)}
-  #ctabs .tab-items{display:flex;align-items:center;gap:4px;min-width:0}
-  .ctab{padding:5px 16px;border:0;background:transparent;border-radius:8px;cursor:pointer;color:var(--muted);font-size:12.5px}
+  #ctabs .tab-items{display:flex;align-items:center;gap:4px;min-width:0;flex:1;overflow-x:auto}
+  .ctab{padding:5px 13px;border:0;background:transparent;border-radius:8px;cursor:pointer;color:var(--muted);font-size:12.5px;flex-shrink:0}
   .ctab:hover{color:var(--ink)}
   .ctab.on{background:var(--panel3);color:var(--accent2);font-weight:700}
   #ctabs .tools{margin-left:auto;display:flex;gap:6px;align-items:center}
@@ -297,6 +297,7 @@
   .hcard{border-radius:10px;padding:8px 11px;margin-bottom:7px;font-size:12px;cursor:pointer;border:1px solid;display:flex;gap:8px;align-items:flex-start;line-height:1.5}
   .hcard:hover{filter:brightness(1.15)}
   .hcard.red{background:#2b1a22;border-color:#57303f;color:#f0b9c5}
+  .hcard.yellow{background:rgba(239,202,120,.1);border-color:rgba(239,202,120,.38);color:var(--yellow);cursor:default}
   .hcard.green{background:#182b20;border-color:#2e5740;color:#a9e3bd}
   .hcard.gray{background:var(--panel2);border-color:var(--line);color:var(--muted);cursor:default}
   .hcard .hx{margin-left:auto;flex-shrink:0;font-size:10px;padding:1px 8px;border-radius:6px;background:rgba(255,255,255,.08);white-space:nowrap}
@@ -357,7 +358,7 @@
   <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
 </svg>
 <div id="topbar">
-  <div id="logo"><span class="dot">魅</span>魅魔工作台 <span style="color:var(--dim);font-weight:400;font-size:11px">聊天页复刻沙盒 · 离线运行</span></div>
+  <div id="logo"><span class="dot">魅</span>魅魔工作台 <span style="color:var(--dim);font-weight:400;font-size:11px">真站实时美化 · 本地运行</span></div>
   <span id="badge">待命</span>
   <span id="sb-url"></span>
   <button class="ghost" id="btn-open" title="在新标签页打开沙盒站点"><svg class="ic"><use href="#i-external"/></svg> 新页打开</button>
@@ -399,6 +400,7 @@
         <button id="tab-comp" class="ctab" data-view="comp" role="tab" aria-selected="false" aria-controls="view-comp" tabindex="-1" title="可视化组件：勾选+拖拽+调参，不用写代码"><svg class="ic"><use href="#i-blocks"/></svg> 组件</button>
         <button id="tab-assets" class="ctab" data-view="assets" role="tab" aria-selected="false" aria-controls="view-assets" tabindex="-1" title="图片/底图/图标替换：选位置+贴图床 URL"><svg class="ic"><use href="#i-image"/></svg> 素材</button>
         <button id="tab-slots" class="ctab" data-view="slots" role="tab" aria-selected="false" aria-controls="view-slots" tabindex="-1" title="往页面插槽里添加新 UI 模块：悬浮按钮/侧边栏/横幅等"><svg class="ic"><use href="#i-layout"/></svg> 插槽</button>
+        <button id="tab-project" class="ctab" data-view="project" role="tab" aria-selected="false" aria-controls="view-project" tabindex="-1" title="模板、快照、历史与发布前测试"><svg class="ic"><use href="#i-box"/></svg> 项目</button>
       </div>
       <div class="tools">
         <button id="btn-devset" title="预览设置"><svg class="ic"><use href="#i-gear"/></svg> 预览设置</button>
@@ -416,9 +418,9 @@
           <span>沙盒</span>
           <select id="sb-mode">
             <option value="" selected>选择模式…</option>
-            <option value="local">本地复刻·离线（推荐）</option>
-            <option value="chat">真站·聊天页</option>
+            <option value="chat">真站·聊天页（推荐）</option>
             <option value="create">真站·创作界面</option>
+            <option value="local">本地复刻·离线演示（功能不完整）</option>
           </select>
           <label id="role-id-wrap" title="用于聊天/创作预览与发布；默认保留原角色 204786" style="display:flex;align-items:center;gap:4px;flex-shrink:0">角色 ID
             <input id="role-id" value="204786" inputmode="numeric" pattern="[0-9]+" aria-label="角色 ID" style="width:72px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:2px 6px;font-size:11px">
@@ -455,11 +457,11 @@
             <div class="sandbox-empty-card">
               <span class="empty-kicker">安全预览区</span>
               <h2>先看到效果，再开始创作</h2>
-              <p>推荐从完全离线的本地示例开始。所有修改只作用于沙盒，不会碰线上内容。</p>
+              <p>推荐直接在真站聊天页实时编辑、即时看到真实效果。预览改动不会写入线上内容，只有主动发布才会生效。</p>
               <div class="empty-mode-list">
-                <button class="empty-mode primary" data-empty-mode="local"><span>✓</span><span><b>打开离线示例</b><small>无需登录 · 立即体验换色和组件</small></span></button>
-                <button class="empty-mode" data-empty-mode="chat"><span>↗</span><span><b>打开真站聊天页</b><small>使用真实页面预览，可能需要先登录</small></span></button>
+                <button class="empty-mode primary" data-empty-mode="chat"><span>✓</span><span><b>打开真站聊天页（推荐）</b><small>真实结构 · 编辑后立即看到效果</small></span></button>
                 <button class="empty-mode" data-empty-mode="create"><span>✦</span><span><b>打开创作界面</b><small>预览正则、世界书和开场白编辑区</small></span></button>
+                <button class="empty-mode" data-empty-mode="local"><span>◌</span><span><b>打开本地离线演示</b><small>功能不完整 · 仅供断网排查基础样式</small></span></button>
               </div>
               <div id="sandbox-empty-status" role="status" aria-live="polite"></div>
             </div>
@@ -540,6 +542,10 @@
         </div>
       </div>
     </div>
+    <!-- 项目闭环：模板、快照、历史、发布前测试 -->
+    <div class="cview" id="view-project" role="tabpanel" aria-labelledby="tab-project">
+      <div id="project-studio" aria-live="polite"></div>
+    </div>
   </div>
   <!-- ═══ 右：AI 助手 ═══ -->
   <div id="right">
@@ -566,6 +572,14 @@
       <input id="llm-model" placeholder="模型名（点“拉取模型列表”后从下方列表选择）" style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:4px 8px;font-size:11px;box-sizing:border-box">
       <div id="llm-models-box" style="display:none;max-height:132px;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:6px;margin-top:4px"></div>
       <label style="display:flex;gap:5px;align-items:center;font-size:11px;color:var(--muted);margin-top:6px"><input type="checkbox" id="llm-plain"> 纯文本模型（不支持严格 JSON 输出的模型勾选：直接返回代码，工作台自动识别应用）</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:7px">
+        <label style="font-size:10.5px;color:var(--muted)">上下文预算（tokens）<input id="llm-context" type="number" min="2048" max="128000" step="1024" style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:4px 6px;margin-top:2px"></label>
+        <label style="font-size:10.5px;color:var(--muted)">输出上限（tokens）<input id="llm-output" type="number" min="256" max="8192" step="256" style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:4px 6px;margin-top:2px"></label>
+        <label style="font-size:10.5px;color:var(--muted)">压缩后保留最近轮次<select id="llm-keep-turns" style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:4px 6px;margin-top:2px"><option value="4">4 轮</option><option value="8">8 轮</option><option value="12">12 轮</option><option value="20">20 轮</option></select></label>
+        <label style="display:flex;gap:5px;align-items:center;font-size:10.5px;color:var(--muted);padding-top:17px"><input type="checkbox" id="llm-auto-summary"> 接近上限时自动压缩总结</label>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:6px;align-items:center"><button id="llm-compress" style="padding:3px 8px">压缩当前会话</button><span id="llm-memory-status" style="font-size:10.5px;color:var(--dim)"></span></div>
+      <details id="llm-memory-details" style="display:none;margin-top:5px;font-size:10.5px;color:var(--muted)"><summary style="cursor:pointer;color:var(--accent2)">查看持久摘要</summary><div id="llm-memory-summary" style="max-height:100px;overflow:auto;white-space:pre-wrap;padding:5px 0"></div></details>
       <div style="display:flex;gap:6px;margin-top:6px;align-items:center"><button id="llm-save" class="primary" style="padding:3px 10px">保存</button><button id="llm-fetch" style="padding:3px 10px">⬇ 拉取模型列表</button><span id="llm-cfg-msg" style="font-size:11px;color:var(--green)"></span></div>
     </div>
     <div id="ai-chat"></div>
@@ -585,7 +599,7 @@
   <span id="st-inject">注入: 就绪</span><span class="sep">|</span>
   <span id="st-files">文件: 0</span><span class="sep">|</span>
   <span id="st-last">最近操作: 无</span>
-  <span style="margin-left:auto">魅魔 Agent Workbench v0.5</span>
+  <span style="margin-left:auto">魅魔 Agent Workbench v0.6</span>
 </div>
 <div id="file-menu"></div>
 <!-- 帮助中心（快速开始/常用功能/进阶/常见问题，可重开引导） -->
@@ -634,7 +648,7 @@ if ('serviceWorker' in navigator) {
 const MODES = {
   chat:   { base: '/', hash: () => '#/pages/chat/chat?roleId=' + currentRoleId() + '&prePath=1', note: '真实站点聊天页（整端口代理同源化）· 未登录点「新页打开」登录' },
   create: { base: '/', hash: () => '#/pages/role/create?id=' + currentRoleId(), note: '真实站点创作界面（正则/世界书/开场白编辑页）' },
-  local:  { base: '/wb/mock/mock-chat.html', hash: '#/chat/chat', note: '本地复刻聊天环境 · 完全离线' }
+  local:  { base: '/wb/mock/mock-chat.html', hash: '#/chat/chat', note: '本地离线演示 · 功能与页面结构不完整，仅供断网排查' }
 };
 let MODE = '';
 const roleIdInput = $('#role-id');
@@ -686,7 +700,7 @@ async function loadSandbox(cacheBust) {
     tip.classList.remove('hidden');
     tip.classList.add('loading');
     const state = $('#sandbox-empty-status');
-    if (state) state.textContent = MODE === 'local' ? '正在打开离线示例…' : '正在连接页面…';
+    if (state) state.textContent = MODE === 'local' ? '正在打开不完整离线演示…' : '正在连接页面…';
   }
   if (MODES[MODE]) $('#dev-note').textContent = MODES[MODE].note;
   sb.src = await modeUrl(cacheBust);
@@ -812,7 +826,7 @@ async function injectBridge() {
       term('k-err', '沙盒桥未检测到：可能仍在加载或跳转到登录页，登录完成后点刷新');
     }
     updateUrl();
-    setTimeout(() => runHealth(true), 700);
+    setTimeout(() => runHealth(true), MODE === 'local' ? 700 : 2600);
   } catch (e) {
     sbReady = false;
     const msg = String(e.message || '');
@@ -893,6 +907,7 @@ function activateView(view, focusTab) {
   if (focusTab) selected.focus();
   if (view === 'edit') syncEditor();
   if (view === 'preview') setTimeout(fitPhone, 60);
+  window.dispatchEvent(new CustomEvent('wb:viewchange', { detail: { view } }));
 }
 document.querySelectorAll('.ctab').forEach((t) => {
   t.onclick = () => activateView(t.dataset.view, false);
@@ -1264,8 +1279,9 @@ $('#btn-publish').onclick = async () => {
 /* ════════ 修改记录（写入终端+状态栏，历史存 localStorage） ════════ */
 function addHistory(type, content) {
   const arr = JSON.parse(localStorage.getItem('wb-history') || '[]');
-  arr.push({ ts: tstr(), type, content: String(content).slice(0, 300) });
+  arr.push({ at: Date.now(), ts: tstr(), type, content: String(content).slice(0, 300) });
   localStorage.setItem('wb-history', JSON.stringify(arr.slice(-60)));
+  window.dispatchEvent(new CustomEvent('wb:historychange'));
 }
 
 /* 样式撤销/重做：保存样式文件与组件状态，避免“能改不能反悔” */
@@ -1377,14 +1393,22 @@ aiChat.addEventListener('click', (e) => {
 });
 const SESSIONS_STORE = 'wb-chat-sessions';
 const LEGACY_STORE = 'wb-chat';
-let sessions = [];           // [{id,title,createdAt,messages:[]}]
+let sessions = [];           // [{id,title,createdAt,updatedAt,messages:[],memory:{summary,turns}}]
 let activeSessionId = null;
 let chatLog = [];            // 当前活动会话的 messages 引用
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
 function newSession(title) {
-  return { id: uid(), title: title || '新会话', createdAt: Date.now(), messages: [] };
+  const now = Date.now();
+  return { id: uid(), title: title || '新会话', createdAt: now, updatedAt: now, messages: [], memory: { summary: '', turns: [], compressedTurns: 0, updatedAt: now } };
+}
+function ensureSessionMemory(session) {
+  if (!session.memory || typeof session.memory !== 'object') session.memory = {};
+  if (!Array.isArray(session.memory.turns)) session.memory.turns = [];
+  if (typeof session.memory.summary !== 'string') session.memory.summary = '';
+  if (!Number.isFinite(session.memory.compressedTurns)) session.memory.compressedTurns = 0;
+  return session.memory;
 }
 function loadSessions() {
   let data = null;
@@ -1406,13 +1430,22 @@ function loadSessions() {
     activeSessionId = s.id;
     saveSessions();
   }
+  sessions.forEach(s => {
+    if (!Array.isArray(s.messages)) s.messages = [];
+    if (!s.updatedAt) s.updatedAt = s.createdAt || Date.now();
+    ensureSessionMemory(s);
+  });
   chatLog = activeSession().messages;
 }
 function activeSession() { return sessions.find(s => s.id === activeSessionId) || sessions[0]; }
 function saveSessions() {
   try {
-    sessions.forEach(s => { if (s.messages.length > 120) s.messages = s.messages.slice(-120); });
-    localStorage.setItem(SESSIONS_STORE, JSON.stringify({ sessions: sessions.slice(-30), activeId: activeSessionId }));
+    sessions.forEach(s => {
+      if (s.messages.length > 120) s.messages.splice(0, s.messages.length - 120);
+      const memory = ensureSessionMemory(s);
+      if (memory.turns.length > 160) memory.turns.splice(0, memory.turns.length - 160);
+    });
+    localStorage.setItem(SESSIONS_STORE, JSON.stringify({ version: 2, sessions: sessions.slice(-30), activeId: activeSessionId }));
   } catch (e) {}
 }
 function titleFromMessages(msgs) {
@@ -1429,6 +1462,7 @@ function logMsg(entry) {
   const s = activeSession();
   // 首条用户消息自动生成会话标题
   if (entry.type === 'me' && (!s.title || s.title === '新会话')) s.title = titleFromMessages(chatLog);
+  s.updatedAt = Date.now();
   saveSessions();
 }
 
@@ -1806,11 +1840,19 @@ function renderProgressCard(entry) {
 
 /* ---- 一键发布：package.json → 角色卡（API 直写，追加语义不误删） ---- */
 async function publishCurrentPackage() {
+  let raw = (FS['package.json'] || {}).content || '';
+  if (window.MMProjectStudio) {
+    const gate = window.MMProjectStudio.preflight({ forPublish: true, source: 'publish', packageJson: raw });
+    if (!gate.ok) {
+      window.MMProjectStudio.open('test');
+      throw new Error('发布前测试未通过：' + gate.errors[0]);
+    }
+    raw = gate.json || raw;
+  }
   const w = sb.contentWindow;
   if (!w) throw new Error('沙盒未就绪');
   if (!w.MMPublish && publisherCode) { try { w.eval(publisherCode); } catch (e) {} }
   if (!w.MMPublish) throw new Error('发布模块不可用：请切到真站模式并登录');
-  const raw = (FS['package.json'] || {}).content || '';
   const looksLikePkg = raw.indexOf('regex_scripts') >= 0 || raw.trim().indexOf('[') === 0;
   if (!raw.trim() || raw.length < 60 || !looksLikePkg) {
     currentFile = 'package.json'; openInEditor('package.json');
@@ -1920,8 +1962,51 @@ function writeAndApply(name, content, historyLabel, trackHistory) {
   return '已写入 ' + name + ' 并实时应用到沙盒';
 }
 /* ════════ 真 LLM 接入（经本地服务器 /wb/api/llm 中继，避 CORS） ════════ */
-function llmCfg() { try { return JSON.parse(localStorage.getItem('wb-llm') || '{}'); } catch (e) { return {}; } }
+const LLM_MEMORY_DEFAULTS = { contextTokens: 12000, maxOutputTokens: 2500, keepTurns: 8, autoSummary: true };
+function boundedInt(value, fallback, min, max) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.max(min, Math.min(max, Math.round(n))) : fallback;
+}
+function llmCfg() {
+  let value = {};
+  try { value = JSON.parse(localStorage.getItem('wb-llm') || '{}') || {}; } catch (e) {}
+  value = Object.assign({}, LLM_MEMORY_DEFAULTS, value);
+  value.contextTokens = boundedInt(value.contextTokens, LLM_MEMORY_DEFAULTS.contextTokens, 2048, 128000);
+  value.maxOutputTokens = boundedInt(value.maxOutputTokens, LLM_MEMORY_DEFAULTS.maxOutputTokens, 256, Math.min(8192, value.contextTokens - 512));
+  value.keepTurns = boundedInt(value.keepTurns, LLM_MEMORY_DEFAULTS.keepTurns, 4, 20);
+  value.autoSummary = value.autoSummary !== false;
+  return value;
+}
 window.llmCfg = llmCfg;
+function fillLLMMemoryFields(cfg) {
+  $('#llm-context').value = cfg.contextTokens;
+  $('#llm-output').value = cfg.maxOutputTokens;
+  $('#llm-keep-turns').value = String(cfg.keepTurns);
+  $('#llm-auto-summary').checked = cfg.autoSummary !== false;
+  renderLLMMemoryStatus();
+}
+function llmMemoryFields() {
+  const contextTokens = boundedInt($('#llm-context').value, 12000, 2048, 128000);
+  return {
+    contextTokens,
+    maxOutputTokens: boundedInt($('#llm-output').value, 2500, 256, Math.min(8192, contextTokens - 512)),
+    keepTurns: boundedInt($('#llm-keep-turns').value, 8, 4, 20),
+    autoSummary: $('#llm-auto-summary').checked
+  };
+}
+function renderLLMMemoryStatus(message) {
+  const el = $('#llm-memory-status');
+  if (!el || !activeSession()) return;
+  const memory = ensureSessionMemory(activeSession());
+  const turns = Math.ceil(memory.turns.length / 2);
+  el.textContent = message || ('当前会话：' + turns + ' 轮' + (memory.summary ? ' · 已有持久摘要' : ''));
+  const details = $('#llm-memory-details');
+  const summary = $('#llm-memory-summary');
+  if (details && summary) {
+    details.style.display = memory.summary ? 'block' : 'none';
+    summary.textContent = memory.summary || '';
+  }
+}
 function llmBadge(state) {
   const c = llmCfg();
   const el = $('#llm-state');
@@ -1954,6 +2039,7 @@ $('#btn-llm-cfg').onclick = () => {
     $('#llm-key').value = c.apiKey || '';
     $('#llm-model').value = c.model || 'hunyuan-lite';
     $('#llm-plain').checked = !!c.plain;
+    fillLLMMemoryFields(c);
     $('#llm-cfg-msg').textContent = '';
     window.renderProfileSelect();
   }
@@ -1962,11 +2048,13 @@ $('#btn-llm-cfg').onclick = () => {
 $('#llm-profile-sel').onchange = () => {
   const p = window.getProfiles().find(x => x.id === $('#llm-profile-sel').value);
   if (!p) return;
-  localStorage.setItem('wb-llm', JSON.stringify({ baseUrl: p.baseUrl, apiKey: p.apiKey, model: p.model, plain: !!p.plain, profileId: p.id }));
+  const memoryCfg = Object.assign({}, LLM_MEMORY_DEFAULTS, llmCfg(), p);
+  localStorage.setItem('wb-llm', JSON.stringify({ baseUrl: p.baseUrl, apiKey: p.apiKey, model: p.model, plain: !!p.plain, profileId: p.id, contextTokens: memoryCfg.contextTokens, maxOutputTokens: memoryCfg.maxOutputTokens, keepTurns: memoryCfg.keepTurns, autoSummary: memoryCfg.autoSummary !== false }));
   $('#llm-base').value = p.baseUrl || '';
   $('#llm-key').value = p.apiKey || '';
   $('#llm-model').value = p.model || '';
   $('#llm-plain').checked = !!p.plain;
+  fillLLMMemoryFields(memoryCfg);
   llmBadge();
   $('#llm-cfg-msg').textContent = '✓ 已切换到档案「' + p.name + '」';
   $('#llm-cfg-msg').style.color = 'var(--green)';
@@ -1976,12 +2064,12 @@ $('#llm-profile-save').onclick = () => {
   const name = prompt('给这个 HTTPS 端点档案起个名字（如：混元 / DeepSeek / OpenAI）：', '');
   if (!name) return;
   const list = window.getProfiles();
-  const p = { id: window.profId(), name: name.trim(), baseUrl: $('#llm-base').value.trim(), apiKey: $('#llm-key').value.trim(), model: $('#llm-model').value.trim(), plain: $('#llm-plain').checked };
+  const p = Object.assign({ id: window.profId(), name: name.trim(), baseUrl: $('#llm-base').value.trim(), apiKey: $('#llm-key').value.trim(), model: $('#llm-model').value.trim(), plain: $('#llm-plain').checked }, llmMemoryFields());
   if (!p.apiKey) { $('#llm-cfg-msg').textContent = '⚠ Key 为空，确定要保存？已保存'; }
   const idx = list.findIndex(x => x.name === p.name);
   if (idx >= 0) { p.id = list[idx].id; list[idx] = p; } else list.push(p);
   window.saveProfiles(list);
-  localStorage.setItem('wb-llm', JSON.stringify({ baseUrl: p.baseUrl, apiKey: p.apiKey, model: p.model, plain: p.plain, profileId: p.id }));
+  localStorage.setItem('wb-llm', JSON.stringify({ baseUrl: p.baseUrl, apiKey: p.apiKey, model: p.model, plain: p.plain, profileId: p.id, contextTokens: p.contextTokens, maxOutputTokens: p.maxOutputTokens, keepTurns: p.keepTurns, autoSummary: p.autoSummary }));
   llmBadge(); window.renderProfileSelect();
   $('#llm-cfg-msg').textContent = '✓ 档案「' + p.name + '」已保存并启用';
   $('#llm-cfg-msg').style.color = 'var(--green)';
@@ -2001,12 +2089,12 @@ $('#llm-profile-del').onclick = () => {
   $('#llm-cfg-msg').style.color = 'var(--muted)';
 };
 $('#llm-save').onclick = () => {
-  const cfg = {
+  const cfg = Object.assign({
     baseUrl: $('#llm-base').value.trim(),
     apiKey: $('#llm-key').value.trim(),
     model: $('#llm-model').value.trim(),
     plain: $('#llm-plain').checked
-  };
+  }, llmMemoryFields());
   // 若当前属于某档案，保存时同步更新该档案（保持一键切换内容最新）
   const cur = llmCfg();
   if (cur.profileId) {
@@ -2022,6 +2110,17 @@ $('#llm-save').onclick = () => {
   llmBadge(); window.renderProfileSelect();
   $('#llm-cfg-msg').textContent = '✓ 已保存';
   setTimeout(() => { $('#llm-cfg').style.display = 'none'; }, 500);
+};
+$('#llm-compress').onclick = async () => {
+  const button = $('#llm-compress');
+  button.disabled = true;
+  renderLLMMemoryStatus('正在压缩当前会话…');
+  try {
+    const changed = await compactActiveSession(true);
+    if (!changed) renderLLMMemoryStatus('可压缩的旧对话不足，继续聊几轮后再试');
+  } catch (e) {
+    renderLLMMemoryStatus('压缩失败：' + e.message);
+  } finally { button.disabled = false; }
 };
 $('#llm-fetch').onclick = async () => {
   const msg = $('#llm-cfg-msg');
@@ -2108,25 +2207,103 @@ function parseLLMOutput(content) {
   if (sniffed) return sniffed;
   return { reply: content, actions: [] };
 }
-const llmHistory = [];
-async function callLLM(text, extraContext) {
-  const cfg = llmCfg();
-  const userMsg = extraContext ? (text + '\n\n' + extraContext) : text;
-  llmHistory.push({ role: 'user', content: userMsg.slice(0, 6000) });
+function estimateTokens(value) {
+  const text = String(value || '');
+  const cjk = (text.match(/[\u3400-\u9fff\uf900-\ufaff]/g) || []).length;
+  return cjk + Math.ceil((text.length - cjk) / 4);
+}
+async function rawLLMRequest(cfg, messages, maxTokens) {
   const r = await fetch('/wb/api/llm', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model,
-      messages: [{ role: 'system', content: cfg.plain ? LLM_SYSTEM_PLAIN : LLM_SYSTEM }].concat(llmHistory.slice(-10))
+      maxTokens: boundedInt(maxTokens, cfg.maxOutputTokens, 256, 8192),
+      messages
     })
   });
-  const j = await r.json();
+  const raw = await r.text();
+  let j;
+  try { j = JSON.parse(raw); }
+  catch (e) { throw new Error(raw.slice(0, 160) || ('模型中继返回 HTTP ' + r.status)); }
   if (j.error) throw new Error(j.error.message || JSON.stringify(j.error).slice(0, 120));
   const content = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
   if (!content) throw new Error('模型无返回内容');
-  llmHistory.push({ role: 'assistant', content });
-  return parseLLMOutput(content);
+  return content;
+}
+function memoryTranscript(turns) {
+  return turns.map(item => (item.role === 'assistant' ? '助手：' : '用户：') + String(item.content || '')).join('\n\n');
+}
+async function compactActiveSession(force) {
+  const cfg = llmCfg();
+  if (!cfg.apiKey) throw new Error('请先配置大模型 API Key');
+  const session = activeSession();
+  const memory = ensureSessionMemory(session);
+  const keepMessages = force ? Math.min(2, memory.turns.length) : Math.min(memory.turns.length, cfg.keepTurns * 2);
+  const splitAt = memory.turns.length - keepMessages;
+  if (splitAt < 2) return false;
+  const oldTurns = memory.turns.slice(0, splitAt);
+  const prompt = '请把下面对话压缩成可长期复用的中文记忆摘要。保留用户目标、明确偏好、已做决定、关键代码/参数、未完成事项和风险；去掉寒暄、重复与临时快照。只输出摘要正文，不要执行动作。';
+  const input = (memory.summary ? '已有摘要：\n' + memory.summary + '\n\n' : '') + '待压缩对话：\n' + memoryTranscript(oldTurns);
+  const summaryBudget = Math.min(1600, cfg.maxOutputTokens);
+  const maxSummaryInput = Math.max(1500, Math.min(48000, cfg.contextTokens - summaryBudget - 500));
+  const summary = await rawLLMRequest(cfg, [{ role: 'system', content: prompt }, { role: 'user', content: input.slice(-maxSummaryInput) }], summaryBudget);
+  memory.summary = String(summary).slice(0, 8000);
+  memory.turns = memory.turns.slice(splitAt);
+  memory.compressedTurns += oldTurns.length;
+  memory.updatedAt = Date.now();
+  session.updatedAt = Date.now();
+  saveSessions();
+  renderLLMMemoryStatus('已压缩 ' + Math.ceil(oldTurns.length / 2) + ' 轮 · 摘要已持久化');
+  return true;
+}
+function buildMemoryMessages(cfg, extraContext) {
+  const memory = ensureSessionMemory(activeSession());
+  const system = cfg.plain ? LLM_SYSTEM_PLAIN : LLM_SYSTEM;
+  const fixed = [{ role: 'system', content: system }];
+  if (memory.summary) fixed.push({ role: 'system', content: '持久对话记忆摘要（如与当前用户消息冲突，以当前消息为准）：\n' + memory.summary });
+  const turns = memory.turns.map(item => ({ role: item.role, content: String(item.content || '') }));
+  if (turns.length && extraContext && turns[turns.length - 1].role === 'user') turns[turns.length - 1].content += '\n\n' + extraContext;
+  const reserve = Math.min(cfg.maxOutputTokens, Math.floor(cfg.contextTokens / 2));
+  const budget = Math.max(1024, cfg.contextTokens - reserve);
+  while (turns.length > 2 && estimateTokens(fixed.map(x => x.content).join('\n') + turns.map(x => x.content).join('\n')) > budget) turns.shift();
+  return fixed.concat(turns);
+}
+async function maybeCompactActiveSession(cfg, extraContext) {
+  if (!cfg.autoSummary) return false;
+  const memory = ensureSessionMemory(activeSession());
+  const projected = estimateTokens((memory.summary || '') + memoryTranscript(memory.turns) + (extraContext || '')) + cfg.maxOutputTokens;
+  if (projected < cfg.contextTokens * 0.82 || memory.turns.length <= cfg.keepTurns * 2) return false;
+  try { return await compactActiveSession(false); }
+  catch (e) {
+    renderLLMMemoryStatus('自动压缩失败，本轮将只发送预算内最近对话');
+    return false;
+  }
+}
+async function callLLM(text, extraContext) {
+  const cfg = llmCfg();
+  const session = activeSession();
+  const memory = ensureSessionMemory(session);
+  const turn = { role: 'user', content: String(text).slice(0, 16000), at: Date.now() };
+  memory.turns.push(turn);
+  memory.updatedAt = Date.now();
+  session.updatedAt = Date.now();
+  saveSessions();
+  await maybeCompactActiveSession(cfg, extraContext);
+  try {
+    const content = await rawLLMRequest(cfg, buildMemoryMessages(cfg, extraContext), cfg.maxOutputTokens);
+    memory.turns.push({ role: 'assistant', content: String(content).slice(0, 24000), at: Date.now() });
+    memory.updatedAt = Date.now();
+    session.updatedAt = Date.now();
+    saveSessions();
+    renderLLMMemoryStatus();
+    return parseLLMOutput(content);
+  } catch (e) {
+    const index = memory.turns.indexOf(turn);
+    if (index >= 0) memory.turns.splice(index, 1);
+    saveSessions();
+    throw e;
+  }
 }
 const MAX_FIX_ROUNDS = 2;
 async function executeAgentPlan(text, actions) {
@@ -2259,6 +2436,8 @@ $('#degraded-cfg').onclick = () => {
   $('#llm-base').value = c.baseUrl || 'https://api.hunyuan.cloud.tencent.com/v1';
   $('#llm-key').value = c.apiKey || '';
   $('#llm-model').value = c.model || 'hunyuan-lite';
+  $('#llm-plain').checked = !!c.plain;
+  fillLLMMemoryFields(c);
   window.renderProfileSelect && window.renderProfileSelect();
 };
 $('#ai-input').addEventListener('keydown', (e) => {
@@ -2267,13 +2446,14 @@ $('#ai-input').addEventListener('keydown', (e) => {
 let lastCleared = null;
 $('#btn-ai-clear').onclick = () => {
   if (!chatLog.length) return;
-  lastCleared = { title: activeSession().title, messages: chatLog.slice() };
-  chatLog.length = 0; activeSession().title = '新会话'; saveSessions();
+  lastCleared = { title: activeSession().title, messages: chatLog.slice(), memory: JSON.parse(JSON.stringify(ensureSessionMemory(activeSession()))) };
+  chatLog.length = 0; activeSession().title = '新会话'; activeSession().memory = { summary: '', turns: [], compressedTurns: 0, updatedAt: Date.now() }; saveSessions();
   aiChat.innerHTML = ''; greet(); runHealth(true);
   const bar = aiMsg('ai', '已清空当前对话。<button id="btn-undo-clear" style="margin-left:6px;padding:2px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel3);color:var(--ink);cursor:pointer">↩ 撤销</button>');
   bar.querySelector('#btn-undo-clear').onclick = () => {
     if (!lastCleared) return;
     activeSession().title = lastCleared.title;
+    activeSession().memory = lastCleared.memory;
     chatLog.length = 0;
     lastCleared.messages.forEach(m => chatLog.push(m));
     saveSessions(); renderChatFromLog(chatLog);
@@ -2289,12 +2469,15 @@ function fmtSessDate(ts) {
 }
 function renderSessionPanel() {
   const box = $('#session-panel');
-  box.innerHTML = sessions.slice().sort((a, b) => b.createdAt - a.createdAt).map(s =>
+  box.innerHTML = sessions.slice().sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)).map(s => {
+    const memory = ensureSessionMemory(s);
+    return (
     '<div class="sess-item' + (s.id === activeSessionId ? ' active' : '') + '" data-id="' + s.id + '">' +
-    '<span class="sess-title">' + esc(s.title || '新会话') + '</span>' +
-    '<span class="sess-date">' + fmtSessDate(s.createdAt) + '</span>' +
+    '<span class="sess-title">' + esc(s.title || '新会话') + (memory.summary ? ' · 🧠' : '') + '</span>' +
+    '<span class="sess-date">' + fmtSessDate(s.updatedAt || s.createdAt) + '</span>' +
     '<span class="sess-del" data-del="' + s.id + '" title="删除会话">🗑</span></div>'
-  ).join('') || '<div style="padding:8px 10px;font-size:11px;color:var(--dim)">暂无会话</div>';
+    );
+  }).join('') || '<div style="padding:8px 10px;font-size:11px;color:var(--dim)">暂无会话</div>';
   box.querySelectorAll('.sess-item').forEach(it => {
     it.onclick = (e) => {
       if (e.target.dataset.del) return;
@@ -2320,6 +2503,7 @@ $('#btn-ai-new').onclick = () => {
   saveSessions();
   renderChatFromLog([]);
   greet();
+  renderLLMMemoryStatus();
   $('#session-panel').style.display = 'none';
   term('k-cmd', '已开启新聊天');
 };
@@ -2329,6 +2513,7 @@ function switchSession(id) {
   chatLog = activeSession().messages;
   saveSessions();
   renderChatFromLog(chatLog);
+  renderLLMMemoryStatus();
   term('k-cmd', '已切换到会话「' + activeSession().title + '」');
 }
 function deleteSession(id) {
@@ -2370,7 +2555,7 @@ function runHealth(silent) {
     const brokenImages = images.filter(img => img.complete && !img.naturalWidth);
 
     if (msgList) {
-      checks.push({ lv: 'green', txt: '聊天环境完整（消息列表/气泡/输入框均就绪' + (MODE === 'local' ? '，本地复刻' : '，真实页面') + '）', fix: null });
+      checks.push({ lv: MODE === 'local' ? 'yellow' : 'green', txt: MODE === 'local' ? '本地演示的基础聊天结构已加载；它不覆盖真站全部页面，请勿用于最终验收' : '真实聊天环境完整（消息列表/气泡/输入框均就绪，可实时编辑）', fix: null });
       if (!liveCss) checks.push({ lv: 'gray', txt: '尚未注入实时样式，可以开始创作了', fix: null });
       if (pkgCount === 0) checks.push({ lv: 'gray', txt: '尚未装载任何美化包（可在「插槽/导出」页签导出自己的包后装载）', fix: () => { const p = makePlan('装载美化包'); if (p) p.run(); return '已发起装载（若 package.json 为空，先粘贴导出 JSON）'; } });
     } else if (MODE === 'create') {
@@ -2385,7 +2570,7 @@ function runHealth(silent) {
     } else if (images.length) {
       checks.push({ lv: 'green', txt: '页面图片资源已成功加载（' + images.length + ' 个）', fix: null });
     }
-    checks.push({ lv: MODE === 'local' ? 'green' : 'gray', txt: MODE === 'local' ? '本地沙盒离线可用：不依赖目标网站，永不失效' : '当前为真实站点模式：改动实时生效于真页面，刷新即还原', fix: null });
+    checks.push({ lv: MODE === 'local' ? 'yellow' : 'green', txt: MODE === 'local' ? '本地复刻仅作不完整离线演示；推荐切回真站聊天页实时编辑和最终验收' : '当前为真实站点模式：改动实时生效于真页面，刷新即还原', fix: null });
 
     if (hcWrap) hcWrap.remove();
     hcWrap = document.createElement('div');
@@ -2401,7 +2586,7 @@ function runHealth(silent) {
     checks.forEach((c) => {
       const card = document.createElement('div');
       card.className = 'hcard ' + c.lv;
-      card.innerHTML = '<span>' + ({ red: '⚠', green: '✓', gray: '◌' })[c.lv] + '</span><span>' + esc(c.txt) + '</span>' + (c.fix ? '<span class="hx">修复</span>' : '');
+      card.innerHTML = '<span>' + ({ red: '⚠', yellow: '⚠', green: '✓', gray: '◌' })[c.lv] + '</span><span>' + esc(c.txt) + '</span>' + (c.fix ? '<span class="hx">修复</span>' : '');
       if (c.fix) card.onclick = async () => {
         const r = await c.fix();
         aiMsg('ai', '🔧 体检修复：' + esc(String(r)));
@@ -2421,16 +2606,20 @@ function runHealth(silent) {
 
 /* ════════ 初始化 ════════ */
 function greet() {
-  aiMsg('ai', '你好！我是你的<b>页面美化编程助手</b>。<br>· 沙盒三种模式（左上角）：真站聊天页 / 创作界面 / 本地复刻，也可粘贴任意网址打开<br>· 直接说需求（例：换成粉色配色），我会<b>先给计划、确认后执行、逐步显示进度</b><br>· 全部能力见 <b>skills/技能库.md</b>；点 ⚙ 配置大模型可理解任意指令<br>· 说“发布”可把 package.json 一键写入角色卡');
+  aiMsg('ai', '你好！我是你的<b>页面美化编程助手</b>。<br>· 推荐使用<b>真站聊天页</b>实时编辑；本地复刻只是不完整的离线演示<br>· 直接说需求（例：换成粉色配色），我会<b>先给计划、确认后执行、逐步显示进度</b><br>· “项目”页可用模板、快照、历史和发布前测试形成长期创作闭环<br>· 点 ⚙ 可配置模型上下文与持久记忆；说“发布”可把当前美化包写入角色卡');
 }
 restoreChat();
 llmBadge();
 window.renderProfileSelect && window.renderProfileSelect();
 fitPhone();
 const savedSandboxMode = localStorage.getItem('wb-sandbox-mode');
-if (MODES[savedSandboxMode]) selectSandboxMode(savedSandboxMode);
-else if (localStorage.getItem('wb-onboard')) selectSandboxMode('local');
-runHealth(true);
+const realSiteMigration = 'wb-real-site-first-v1';
+if (localStorage.getItem('wb-onboard') && !localStorage.getItem(realSiteMigration)) {
+  localStorage.setItem(realSiteMigration, '1');
+  selectSandboxMode(savedSandboxMode === 'local' || !MODES[savedSandboxMode] ? 'chat' : savedSandboxMode);
+} else if (MODES[savedSandboxMode]) selectSandboxMode(savedSandboxMode);
+else if (localStorage.getItem('wb-onboard')) selectSandboxMode('chat');
+setTimeout(() => runHealth(true), MODE === 'local' ? 0 : 2200);
 setTimeout(injectBridge, 400); // 本地沙盒可能在监听器挂载前就已 load，主动补一次
 openInEditor('styles.css');
 activateView('preview', false);
@@ -3121,13 +3310,41 @@ function exportBeautyPack() {
   if (!regex_scripts.length) throw new Error('还没有任何美化改动：先启用组件/换配色/换素材/加插槽');
   return JSON.stringify({ name: '魅魔工作台美化包', pageDepth: 2, statusbar: regex_scripts.map(r => r.findRegex).join(''), beginning: '', regex_scripts }, null, 2);
 }
+function syncPackageFile(json) {
+  FS['package.json'] = FS['package.json'] || { type: 'pkg', content: '' };
+  if (FS['package.json'].content !== json) {
+    FS['package.json'].content = json;
+    FS['package.json'].updatedAt = Date.now();
+  }
+  saveFS();
+  try { renderFiles(''); } catch (e) {}
+  return json;
+}
+function getRuntimeState() {
+  const state = { mode: MODE, roleId: currentRoleId(), bridgeReady: false, chatReady: false, createReady: false, imageCount: 0, brokenImages: 0, url: '' };
+  try {
+    const w = sb.contentWindow;
+    const doc = w && w.document;
+    const frame = doc && doc.getElementById('chatIframe');
+    const chatDoc = frame && frame.contentDocument;
+    state.bridgeReady = !!(w && w.__WB_BRIDGE__);
+    state.chatReady = !!((doc && doc.getElementById('msglistview')) || (chatDoc && chatDoc.getElementById('msglistview')));
+    state.createReady = !!(doc && doc.querySelectorAll('textarea,input').length >= 2);
+    const images = [doc, chatDoc].filter(Boolean).flatMap(d => Array.from(d.images || []));
+    state.imageCount = images.length;
+    state.brokenImages = images.filter(img => img.complete && !img.naturalWidth).length;
+    state.url = w.location.href;
+  } catch (e) {}
+  return state;
+}
 $('#btn-export').onclick = () => {
   try {
-    const json = exportBeautyPack();
-    FS['package.json'] = FS['package.json'] || { type: 'pkg', content: '' };
-    FS['package.json'].content = json;
-    saveFS();
-    try { renderFiles(''); } catch (e) {}
+    const gate = window.MMProjectStudio && window.MMProjectStudio.preflight({ forPublish: false, source: 'export' });
+    if (gate && !gate.ok) {
+      window.MMProjectStudio.open('test');
+      throw new Error('发布前测试未通过：' + gate.errors[0]);
+    }
+    const json = gate ? gate.json : syncPackageFile(exportBeautyPack());
     const blob = new Blob([json], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -3175,14 +3392,14 @@ function openRegionTemplate(name) {
 /* ---- 帮助中心：快速开始 / 常用功能 / 进阶玩法 / 常见问题 ---- */
 const HELP_DOCS = {
   start:
-    '<h4>第 1 步：先打开离线示例</h4>' +
-    '<div>中间的手机框是<b>沙盒</b>——所有美化都在这里预览，不会直接影响线上。第一次使用推荐点中央的 <b>打开离线示例</b>，无需登录即可练习。</div>' +
+    '<h4>第 1 步：打开真站聊天页</h4>' +
+    '<div>中间的手机框是<b>沙盒</b>——推荐直接打开 <b>真站·聊天页</b>，在真实页面结构上实时编辑、即时看到效果。若出现登录或人机验证，点顶栏“新页打开”登录后回来刷新。</div>' +
     '<h4>第 2 步：一键换配色</h4>' +
     '<div>简洁模式下点底部 <b>换配色</b>，挑一套预设。页面背景、气泡、按钮和输入区会立即变化。</div>' +
     '<h4>第 3 步：用撤销和对比放心尝试</h4>' +
     '<div>设备栏和底部快捷栏都有 <b>撤销</b>；<b>前后对比</b>只会临时隐藏修改，再点一次即可恢复。重做按钮能找回刚撤销的效果。</div>' +
-    '<h4>第 4 步：需要时再切真站</h4>' +
-    '<div>熟悉后从“沙盒”下拉切到 <b>真站·聊天页</b>。满意后导出美化包，发布前仍会要求你确认。</div>',
+    '<h4>第 4 步：保存快照并测试发布</h4>' +
+    '<div>打开 <b>项目</b> 页保存阶段快照，随时恢复；导出或发布前运行 Test Mode，检查包结构、真站连接和相对最近快照的变化。</div>',
   feat:
     '<h4>🎨 页面配色</h4><div>快捷面板「换配色」提供 8 套沙盒页面主题和自定义主色，应用后会显示可撤销提示。</div>' +
     '<h4>◐ 工作台主题</h4><div>顶栏“工作台主题”可切换紫夜、深海、森屿、玫瑰、暖茶和雾蓝，不会改变沙盒里正在制作的页面配色。</div>' +
@@ -3194,9 +3411,11 @@ const HELP_DOCS = {
   adv:
     '<h4>🔎 覆盖率验证</h4><div>组件页点「🔎 覆盖率验证」：按全位置注册表（97 个区域）逐一检查配色盖住了哪些，未命中的会在终端说明原因（大多是弹窗还没打开，属正常）。</div>' +
     '<h4>🧠 AI 端点档案</h4><div>右上 ⚙ 大模型设置：填 HTTPS Base URL / Key / 模型 →「💾 存档案」。可保存多个 OpenAI 兼容端点并从下拉框一键切换；为保护本机，不接受本地或私网地址。</div>' +
-    '<h4>📤 导出与发布</h4><div>「📤 导出包」汇总全部改动（配色+点选+素材+插槽）为平台可导入的 JSON；「🚀 发布到角色卡」直接写入你的卡。发布前先在沙盒确认效果。</div>' +
+    '<h4>🗂 长期创作闭环</h4><div>“项目”页提供内置模板、项目快照、恢复前自动备份、变更历史和发布前 Test Mode。模板应用与快照恢复都留有回退点。</div>' +
+    '<h4>📤 导出与发布</h4><div>「📤 导出包」汇总全部改动（配色+点选+素材+插槽）为平台可导入的 JSON；「🚀 发布到角色卡」直接写入你的卡。导出和发布都会先运行测试，发布要求真站聊天页就绪。</div>' +
     '<h4>🔍 区域标注</h4><div>设备条「区域标注」：悬停沙盒看每个区域的名称，点击可打开该区域的样式模板。</div>' +
-    '<h4>💾 数据存在哪</h4><div>所有配置（组件/素材/插槽/档案）都存在你自己浏览器的本地存储里（localStorage——就是浏览器帮你记东西的小仓库），换浏览器或清缓存会重置。</div>',
+    '<h4>🧠 AI 上下文与记忆</h4><div>大模型设置可配置上下文预算、输出上限和保留轮次。接近预算时，旧对话会压缩为持久摘要；原会话、摘要与最近轮次跨刷新保留。</div>' +
+    '<h4>💾 数据存在哪</h4><div>项目配置、快照和 AI 会话都存在你自己浏览器的本地存储里。项目快照不会包含 API Key、模型档案或聊天记录；换浏览器前可在“项目”页导出快照备份。</div>',
   faq:
     '<h4>常见问题</h4>' +
     '<div class="hd-row"><span class="hd-q">沙盒是空白？</span><span class="hd-a">上方「沙盒」下拉选一个模式（推荐 真站·聊天页）；真站模式第一次需要登录，见下一条。</span></div>' +
@@ -3224,11 +3443,15 @@ $('#help-replay-ob').onclick = () => { closeHelp(); if (window.__wbOpenOnboard) 
 window.__wbExt = {
   getSb: () => sb, PALETTES, buildThemeCss, writeAndApply, verifyApply, addHistory,
   adjustQuickFont, showHelp, openRegionTemplate, aiMsg, reportCoverage, pickElement,
+  activateView, exportBeautyPack, syncPackageFile, getRuntimeState, currentRoleId,
+  getFileState: () => JSON.parse(JSON.stringify(FS)),
+  miniToast: (message, action) => window.miniToast && window.miniToast(message, action), term,
   addDrop: (mod) => { mod.id = uid(); mod.left = mod.left != null ? mod.left : 50; mod.top = mod.top != null ? mod.top : 50; drops.push(mod); saveDrops(); applyDrops(); return mod.id; },
   getDrops: () => drops
 };
 })();
 </script>
+<script src="/wb/src/project-studio.js"></script>
 <!-- 配色面板 -->
 <div id="palette-modal" role="dialog" aria-modal="true" aria-labelledby="palette-title">
   <div id="palette-box">
@@ -3368,10 +3591,10 @@ st.onchange = () => {
 
 /* ---- 首次引导向导 ---- */
 const OB_STEPS = [
-  { task: 'loaded', t: '先在安全示例里动手', h: '中间的手机框是你的<b>预览沙盒</b>。先打开完全离线的示例，不用登录，也不会影响任何线上内容。<br><br>这一步完成后，你会直接看到一张可编辑的聊天页。', action: '打开离线示例' },
+  { task: 'loaded', t: '先连接真实聊天页', h: '中间的手机框是你的<b>实时预览沙盒</b>。推荐直接打开真站聊天页，在真实页面结构上编辑并立即看见效果。<br><br>若遇到登录或人机验证，点顶栏<b>新页打开</b>完成登录，再回工作台刷新。预览修改不会自动发布。', action: '打开真站聊天页' },
   { task: 'palette', t: '亲手完成第一次换色', h: '选一套配色，页面会立刻变化。先关注“效果是否喜欢”，复杂的选择器和覆盖信息会收进技术详情。<div class="ob-palette-picks"><button data-ob-palette="紫"><i style="background:linear-gradient(90deg,#14101f,#a97ff5)"></i>紫夜</button><button data-ob-palette="蓝"><i style="background:linear-gradient(90deg,#0c1420,#4da3ff)"></i>深蓝</button><button data-ob-palette="粉"><i style="background:linear-gradient(90deg,#1a1016,#ff6d97)"></i>柔粉</button></div>' },
   { task: 'undo', t: '学会反悔，才敢大胆尝试', h: '工作台现在会记录最近的样式修改。点击下面的按钮撤销刚才配色，再点设备栏的“重做”即可恢复。<br><br><b>前后对比</b>只会临时隐藏效果，不会删除你的设置。', action: '撤销刚才的配色' },
-  { task: 'done', t: '你的第一次美化已经完成', h: '你已经完成了最重要的闭环：<b>打开示例 → 应用效果 → 安全撤销</b>。接下来可以继续换色、打开“组件”精修，或者直接告诉右侧 AI 你想怎么改。<div class="ob-success"><span>✓ 离线预览</span><span>✓ 即时换色</span><span>✓ 可撤销</span></div>' }
+  { task: 'done', t: '你的第一次美化已经完成', h: '你已经完成了最重要的闭环：<b>连接真站 → 应用效果 → 安全撤销</b>。接下来可以打开“项目”页套用模板、保存快照并运行发布前测试。<div class="ob-success"><span>✓ 真站实时预览</span><span>✓ 即时换色</span><span>✓ 可撤销</span></div>' }
 ];
 let obIdx = 0;
 let obReplay = false;
@@ -3392,15 +3615,15 @@ function obRender() {
   $('#ob-next').disabled = !obReplay && step.task !== 'done' && !obDone[step.task];
   action.onclick = () => {
     if (step.task === 'loaded') {
-      status.textContent = '正在打开离线示例…'; action.disabled = true;
-      window.__wbSelectMode && window.__wbSelectMode('local');
+      status.textContent = '正在连接真站聊天页…'; action.disabled = true;
+      window.__wbSelectMode && window.__wbSelectMode('chat');
       let tries = 0;
       const wait = setInterval(() => {
         tries++;
         const ready = $('#badge').textContent === '已加载';
-        if (ready || tries >= 18) {
+        if (ready || tries >= 40) {
           clearInterval(wait); obDone.loaded = true; action.disabled = false;
-          status.textContent = ready ? '✓ 离线示例已加载' : '离线示例仍在加载，可以继续下一步';
+          status.textContent = ready ? '✓ 真站聊天页已加载，可实时编辑' : '真站仍在加载或等待登录；可继续引导，登录后回来刷新';
           $('#ob-next').disabled = false;
         }
       }, 180);
@@ -3424,7 +3647,7 @@ function obRender() {
 function obFinish() {
   localStorage.setItem('wb-onboard', '1');
   $('#onboard').style.display = 'none';
-  if (!$('#sb-mode').value && window.__wbSelectMode) window.__wbSelectMode('local');
+  if (!$('#sb-mode').value && window.__wbSelectMode) window.__wbSelectMode('chat');
   // 首次完成自动开简洁模式；重看引导不动用户已有配置
   if (!obReplay && !st.checked) { st.checked = true; st.onchange(); }
   if (!obReplay) miniToast('新手体验完成：从换配色或组件开始继续创作');

@@ -195,11 +195,13 @@ function relayLLM(req, res) {
       return;
     }
 
+    const requestedMaxTokens = Number(cfg.maxTokens);
+    const maxTokens = Number.isFinite(requestedMaxTokens) ? Math.max(256, Math.min(8192, Math.round(requestedMaxTokens))) : 2500;
     const payload = JSON.stringify({
       model: cfg.model || 'hunyuan-lite',
       messages: cfg.messages || [],
       temperature: 0.4,
-      max_tokens: 2500
+      max_tokens: maxTokens
     });
     const r2 = https.request({
       hostname: u.hostname,
