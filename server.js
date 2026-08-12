@@ -6,7 +6,7 @@
 const http = require('http');
 const https = require('https');
 const { lookup } = require('dns/promises');
-const { readFile } = require('fs/promises');
+const { readFile, writeFile, mkdir, rename, chmod } = require('fs/promises');
 const { join, resolve, relative, isAbsolute, extname } = require('path');
 const { isIP } = require('net');
 
@@ -15,6 +15,10 @@ const PORT = Number(process.env.PORT || 8793);
 const LOOPBACK_HOST = '127.0.0.1';
 const TARGET_HOST = 'sexyai.ai';
 const MAX_LLM_BODY = 1024 * 1024;
+const MAX_SECRET_BODY = 16 * 1024;
+const PRIVATE_DIR = resolve(process.env.WB_PRIVATE_DIR || join(ROOT, '.mm-workbench-private'));
+const LLM_SECRET_FILE = join(PRIVATE_DIR, 'llm-secrets.json');
+let secretWriteQueue = Promise.resolve();
 
 if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
   throw new Error('PORT 必须是 1-65535 的整数');
@@ -92,7 +96,8 @@ async function serveStatic(req, res, urlPath) {
   catch (e) { res.statusCode = 400; return res.end('400'); }
   const filePath = resolve(ROOT, requestedPath); // 去掉 /wb 前缀映射到工作区根
   const relativePath = relative(ROOT, filePath);
-  if (relativePath === '..' || relativePath.startsWith('..\\') || relativePath.startsWith('../') || isAbsolute(relativePath)) {
+  const hiddenPath = relativePath.split(/[\\/]/).some((part) => part.startsWith('.'));
+  if (relativePath === '..' || relativePath.startsWith('..\\') || relativePath.startsWith('../') || isAbsolute(relativePath) || hiddenPath) {
     res.statusCode = 403;
     return res.end('403');
   }
@@ -104,6 +109,114 @@ async function serveStatic(req, res, urlPath) {
     res.statusCode = 404;
     res.end('404: ' + urlPath);
   }
+}
+
+/* ---------- LLM 密钥仓库（仅服务端持有，浏览器只得到是否已配置） ---------- */
+function sendJson(res, status, value) {
+  res.statusCode = status;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  res.end(JSON.stringify(value));
+}
+
+function readJsonBody(req, maxBytes) {
+  return new Promise((resolveBody, rejectBody) => {
+    let body = '';
+    let size = 0;
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > maxBytes) return;
+      body += chunk;
+    });
+    req.on('end', () => {
+      if (size > maxBytes) return rejectBody(new Error('payload too large'));
+      try { resolveBody(JSON.parse(body || '{}')); }
+      catch (error) { rejectBody(new Error('bad json')); }
+    });
+    req.on('error', rejectBody);
+  });
+}
+
+function emptySecretStore() { return { version: 1, current: '', profiles: Object.create(null) }; }
+function validProfileId(value) {
+  return typeof value === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(value) &&
+    value !== '__proto__' && value !== 'prototype' && value !== 'constructor';
+}
+
+async function readSecretStore() {
+  try {
+    const parsed = JSON.parse(await readFile(LLM_SECRET_FILE, 'utf8'));
+    return {
+      version: 1,
+      current: typeof parsed.current === 'string' ? parsed.current : '',
+      profiles: Object.assign(Object.create(null), parsed.profiles && typeof parsed.profiles === 'object' ? parsed.profiles : {})
+    };
+  } catch (error) {
+    if (error.code === 'ENOENT') return emptySecretStore();
+    throw error;
+  }
+}
+
+async function writeSecretStore(store) {
+  await mkdir(PRIVATE_DIR, { recursive: true, mode: 0o700 });
+  const temporary = LLM_SECRET_FILE + '.tmp-' + process.pid;
+  await writeFile(temporary, JSON.stringify(store, null, 2), { encoding: 'utf8', mode: 0o600 });
+  await rename(temporary, LLM_SECRET_FILE);
+  await chmod(LLM_SECRET_FILE, 0o600).catch(() => {});
+}
+
+function publicSecretState(store) {
+  return {
+    hasCurrent: !!(store.current || process.env.WB_LLM_API_KEY),
+    profileIds: Object.keys(store.profiles).filter((id) => !!store.profiles[id])
+  };
+}
+
+async function handleLLMSecret(req, res) {
+  if (req.method === 'GET') {
+    try {
+      await secretWriteQueue;
+      return sendJson(res, 200, publicSecretState(await readSecretStore()));
+    } catch (error) { return sendJson(res, 500, { error: { message: '读取本地密钥仓库失败' } }); }
+  }
+  if (req.method !== 'PUT') {
+    res.setHeader('Allow', 'GET, PUT');
+    return sendJson(res, 405, { error: { message: 'method not allowed' } });
+  }
+  let body;
+  try { body = await readJsonBody(req, MAX_SECRET_BODY); }
+  catch (error) { return sendJson(res, error.message === 'payload too large' ? 413 : 400, { error: { message: error.message } }); }
+  if (typeof body.apiKey !== 'string' || body.apiKey.length > 8192) {
+    return sendJson(res, 400, { error: { message: 'apiKey 必须是长度不超过 8192 的字符串' } });
+  }
+  if (body.profileId != null && !validProfileId(body.profileId)) {
+    return sendJson(res, 400, { error: { message: 'profileId 无效' } });
+  }
+  try {
+    secretWriteQueue = secretWriteQueue.then(async () => {
+      const store = await readSecretStore();
+      if (body.profileId) {
+        if (body.apiKey) store.profiles[body.profileId] = body.apiKey;
+        else delete store.profiles[body.profileId];
+      } else store.current = body.apiKey;
+      await writeSecretStore(store);
+      return publicSecretState(store);
+    });
+    return sendJson(res, 200, await secretWriteQueue);
+  } catch (error) {
+    secretWriteQueue = Promise.resolve();
+    return sendJson(res, 500, { error: { message: '保存本地密钥仓库失败' } });
+  }
+}
+
+async function resolveLLMKey(profileId) {
+  await secretWriteQueue;
+  const store = await readSecretStore();
+  if (profileId != null) {
+    if (!validProfileId(profileId)) throw new Error('profileId 无效');
+    return store.profiles[profileId] || '';
+  }
+  return store.current || process.env.WB_LLM_API_KEY || '';
 }
 
 /* ---------- LLM 中继（解决浏览器直连模型 API 的 CORS 限制） ---------- */
@@ -167,6 +280,13 @@ function relayLLM(req, res) {
     if (bodyTooLarge) { res.statusCode = 413; return res.end('payload too large'); }
     let cfg;
     try { cfg = JSON.parse(body); } catch (e) { res.statusCode = 400; return res.end('bad json'); }
+    if (Object.prototype.hasOwnProperty.call(cfg, 'apiKey')) {
+      return sendJson(res, 400, { error: { message: 'API Key 必须先保存到本地密钥仓库，禁止随模型请求传输' } });
+    }
+    let apiKey;
+    try { apiKey = await resolveLLMKey(cfg.profileId); }
+    catch (e) { return sendJson(res, 400, { error: { message: e.message } }); }
+    if (!apiKey) return sendJson(res, 401, { error: { message: '尚未在本地密钥仓库配置 API Key' } });
     let target;
     try { target = await resolvePublicTarget(cfg.baseUrl); }
     catch (e) { res.statusCode = 400; return res.end(e.message); }
@@ -178,7 +298,7 @@ function relayLLM(req, res) {
       const rm = https.request({
         hostname: u.hostname, port: u.port || 443,
         path: basePath + '/models', method: 'GET',
-        headers: { 'Authorization': 'Bearer ' + (cfg.apiKey || '') },
+        headers: { 'Authorization': 'Bearer ' + apiKey },
         lookup: pinnedLookup(target.address)
       }, (pres) => {
         let out = '';
@@ -211,7 +331,7 @@ function relayLLM(req, res) {
       lookup: pinnedLookup(target.address),
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + (cfg.apiKey || ''),
+        'Authorization': 'Bearer ' + apiKey,
         'Content-Length': Buffer.byteLength(payload)
       }
     }, (pres) => {
@@ -234,6 +354,9 @@ http.createServer((req, res) => {
   const noQuery = req.url.split('?')[0];
   if (noQuery === '/wb/api/llm') {
     return relayLLM(req, res);
+  }
+  if (noQuery === '/wb/api/llm-secret') {
+    return handleLLMSecret(req, res);
   }
   if (noQuery === '/sw.js') {
     // SW 必须从根路径注册才能拿到全站拦截作用域

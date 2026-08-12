@@ -5,6 +5,8 @@
 *.jpeg
 # 第三方参考美化包（版权归原作者所有，不随本项目分发）
 mock/beauty-package.json
+# 本地模型密钥仓库（由 server.js 创建，绝不提交）
+.mm-workbench-private/
 
 # ═══ 系统与临时文件 ═══
 node_modules/

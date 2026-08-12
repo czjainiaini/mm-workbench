@@ -568,7 +568,8 @@
         <button id="llm-profile-del" title="删除选中的档案" style="padding:2px 8px">🗑</button>
       </div>
       <input id="llm-base" placeholder="Base URL" style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:4px 8px;font-size:11px;margin-bottom:5px;box-sizing:border-box">
-      <input id="llm-key" type="password" placeholder="API Key" style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:4px 8px;font-size:11px;margin-bottom:5px;box-sizing:border-box">
+      <input id="llm-key" type="password" autocomplete="off" placeholder="API Key（保存后由本地服务保管）" style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:4px 8px;font-size:11px;margin-bottom:5px;box-sizing:border-box">
+      <div style="display:flex;align-items:center;gap:6px;margin:-1px 0 5px"><span id="llm-key-state" style="flex:1;font-size:10.5px;color:var(--dim)"></span><button id="llm-key-clear" style="padding:2px 8px">清除已存 Key</button></div>
       <input id="llm-model" placeholder="模型名（点“拉取模型列表”后从下方列表选择）" style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:4px 8px;font-size:11px;box-sizing:border-box">
       <div id="llm-models-box" style="display:none;max-height:132px;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:6px;margin-top:4px"></div>
       <label style="display:flex;gap:5px;align-items:center;font-size:11px;color:var(--muted);margin-top:6px"><input type="checkbox" id="llm-plain"> 纯文本模型（不支持严格 JSON 输出的模型勾选：直接返回代码，工作台自动识别应用）</label>
@@ -599,7 +600,7 @@
   <span id="st-inject">注入: 就绪</span><span class="sep">|</span>
   <span id="st-files">文件: 0</span><span class="sep">|</span>
   <span id="st-last">最近操作: 无</span>
-  <span style="margin-left:auto">魅魔 Agent Workbench v0.6</span>
+  <span style="margin-left:auto">魅魔 Agent Workbench v0.6.1</span>
 </div>
 <div id="file-menu"></div>
 <!-- 帮助中心（快速开始/常用功能/进阶/常见问题，可重开引导） -->
@@ -1864,7 +1865,7 @@ async function publishCurrentPackage() {
   term('k-ok', '发布完成：' + r.rules.length + ' 条规则' + (r.cardUpdated ? ' + 卡片字段' : ''));
   stLast('发布到角色卡');
   return '已发布 ' + r.rules.length + ' 条规则（更新 ' + r.rules.filter((x) => x.updated).length + ' 条）' +
-    (r.cardUpdated ? '，卡片字段(statusbar/开场白)已回写' : '') + '。规则总数 ' + r.beforeCount + '→' + r.afterCount;
+    (r.cardUpdated ? '，卡片字段(statusbar/开场白)已回写' : '') + '。规则总数 ' + r.beforeCount + '→' + r.afterCount + '；失败时会自动补偿回滚';
 }
 
 /* ---- 意图规划器（本地规则引擎，产出均在沙盒内执行，不绕过站点规则） ---- */
@@ -1963,21 +1964,87 @@ function writeAndApply(name, content, historyLabel, trackHistory) {
 }
 /* ════════ 真 LLM 接入（经本地服务器 /wb/api/llm 中继，避 CORS） ════════ */
 const LLM_MEMORY_DEFAULTS = { contextTokens: 12000, maxOutputTokens: 2500, keepTurns: 8, autoSummary: true };
+const LLM_CONFIG_STORE = 'wb-llm';
+const LLM_PROFILE_MIGRATION_STORE = 'wb-llm-profiles';
+let llmSecretState = { hasCurrent: false, profileIds: [] };
 function boundedInt(value, fallback, min, max) {
   const n = Number(value);
   return Number.isFinite(n) ? Math.max(min, Math.min(max, Math.round(n))) : fallback;
 }
 function llmCfg() {
   let value = {};
-  try { value = JSON.parse(localStorage.getItem('wb-llm') || '{}') || {}; } catch (e) {}
+  try { value = JSON.parse(localStorage.getItem(LLM_CONFIG_STORE) || '{}') || {}; } catch (e) {}
+  const legacyHasKey = !!value.apiKey;
+  delete value.apiKey;
   value = Object.assign({}, LLM_MEMORY_DEFAULTS, value);
   value.contextTokens = boundedInt(value.contextTokens, LLM_MEMORY_DEFAULTS.contextTokens, 2048, 128000);
   value.maxOutputTokens = boundedInt(value.maxOutputTokens, LLM_MEMORY_DEFAULTS.maxOutputTokens, 256, Math.min(8192, value.contextTokens - 512));
   value.keepTurns = boundedInt(value.keepTurns, LLM_MEMORY_DEFAULTS.keepTurns, 4, 20);
   value.autoSummary = value.autoSummary !== false;
+  value.hasApiKey = legacyHasKey || hasLLMSecret(value.profileId) || value.hasApiKey === true;
   return value;
 }
 window.llmCfg = llmCfg;
+function hasLLMSecret(profileId) {
+  return profileId ? llmSecretState.profileIds.includes(String(profileId)) : !!llmSecretState.hasCurrent;
+}
+window.hasLLMSecret = hasLLMSecret;
+function saveLLMConfig(value) {
+  const clean = Object.assign({}, value);
+  delete clean.apiKey;
+  clean.hasApiKey = hasLLMSecret(clean.profileId);
+  localStorage.setItem(LLM_CONFIG_STORE, JSON.stringify(clean));
+  return clean;
+}
+function fillLLMSecretField(cfg) {
+  const input = $('#llm-key');
+  input.value = '';
+  input.placeholder = cfg.hasApiKey ? 'API Key 已由本地服务保管（留空保持）' : 'API Key（保存后由本地服务保管）';
+  $('#llm-key-state').textContent = cfg.hasApiKey ? '✓ 已安全保存在本地服务，不会写入浏览器存储' : '尚未保存 Key';
+  $('#llm-key-clear').disabled = !cfg.hasApiKey;
+}
+async function storeLLMSecret(apiKey, profileId) {
+  const body = { apiKey: String(apiKey || '') };
+  if (profileId) body.profileId = String(profileId);
+  const response = await fetch('/wb/api/llm-secret', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  });
+  const state = await response.json().catch(() => ({}));
+  if (!response.ok || state.error) throw new Error((state.error && state.error.message) || '本地密钥仓库不可用');
+  llmSecretState = { hasCurrent: !!state.hasCurrent, profileIds: Array.isArray(state.profileIds) ? state.profileIds.map(String) : [] };
+  return llmSecretState;
+}
+async function initializeLLMSecrets() {
+  const response = await fetch('/wb/api/llm-secret', { cache: 'no-store' });
+  const initial = await response.json().catch(() => ({}));
+  if (!response.ok || initial.error) throw new Error((initial.error && initial.error.message) || '本地密钥仓库不可用');
+  llmSecretState = { hasCurrent: !!initial.hasCurrent, profileIds: Array.isArray(initial.profileIds) ? initial.profileIds.map(String) : [] };
+  let rawCfg = {};
+  let profiles = [];
+  try { rawCfg = JSON.parse(localStorage.getItem(LLM_CONFIG_STORE) || '{}') || {}; } catch (e) {}
+  try { profiles = JSON.parse(localStorage.getItem(LLM_PROFILE_MIGRATION_STORE) || '[]') || []; } catch (e) {}
+  if (!Array.isArray(profiles)) profiles = [];
+  const legacy = [];
+  if (rawCfg.apiKey) legacy.push({ apiKey: rawCfg.apiKey, profileId: rawCfg.profileId || null });
+  profiles.forEach((profile) => { if (profile && profile.apiKey && profile.id) legacy.push({ apiKey: profile.apiKey, profileId: profile.id }); });
+  for (const item of legacy) await storeLLMSecret(item.apiKey, item.profileId);
+  delete rawCfg.apiKey;
+  rawCfg.hasApiKey = hasLLMSecret(rawCfg.profileId);
+  localStorage.setItem(LLM_CONFIG_STORE, JSON.stringify(rawCfg));
+  profiles = profiles.map((profile) => {
+    const clean = Object.assign({}, profile);
+    delete clean.apiKey;
+    clean.hasApiKey = hasLLMSecret(clean.id);
+    return clean;
+  });
+  localStorage.setItem(LLM_PROFILE_MIGRATION_STORE, JSON.stringify(profiles));
+  llmBadge();
+  return llmSecretState;
+}
+const llmSecretReady = initializeLLMSecrets().catch((error) => {
+  term('k-err', '本地密钥仓库初始化失败: ' + error.message);
+  return llmSecretState;
+});
 function fillLLMMemoryFields(cfg) {
   $('#llm-context').value = cfg.contextTokens;
   $('#llm-output').value = cfg.maxOutputTokens;
@@ -2012,7 +2079,7 @@ function llmBadge(state) {
   const el = $('#llm-state');
   if (state === 'busy') { el.textContent = '⏳ 生成中…'; el.style.color = 'var(--yellow)'; return; }
   if (state === 'fail') { el.textContent = '❌ 连接失败'; el.style.color = 'var(--red)'; return; }
-  if (c.apiKey) {
+  if (c.hasApiKey) {
     let name = c.model || 'LLM';
     try {
       if (c.profileId && window.getProfiles) {
@@ -2026,7 +2093,7 @@ function llmBadge(state) {
   else { el.textContent = '🤖 规则引擎'; el.style.color = 'var(--dim)'; }
   // 降级提示条：未配置 Key 时显示
   const dg = document.getElementById('ai-degraded');
-  if (dg) dg.style.display = c.apiKey ? 'none' : 'flex';
+  if (dg) dg.style.display = c.hasApiKey ? 'none' : 'flex';
 }
 window.llmBadge = llmBadge;
 $('#btn-llm-cfg').onclick = () => {
@@ -2036,7 +2103,7 @@ $('#btn-llm-cfg').onclick = () => {
   if (show) {
     const c = llmCfg();
     $('#llm-base').value = c.baseUrl || 'https://api.hunyuan.cloud.tencent.com/v1';
-    $('#llm-key').value = c.apiKey || '';
+    fillLLMSecretField(c);
     $('#llm-model').value = c.model || 'hunyuan-lite';
     $('#llm-plain').checked = !!c.plain;
     fillLLMMemoryFields(c);
@@ -2045,13 +2112,14 @@ $('#btn-llm-cfg').onclick = () => {
   }
 };
 /* 档案切换 */
-$('#llm-profile-sel').onchange = () => {
+$('#llm-profile-sel').onchange = async () => {
+  await llmSecretReady;
   const p = window.getProfiles().find(x => x.id === $('#llm-profile-sel').value);
   if (!p) return;
   const memoryCfg = Object.assign({}, LLM_MEMORY_DEFAULTS, llmCfg(), p);
-  localStorage.setItem('wb-llm', JSON.stringify({ baseUrl: p.baseUrl, apiKey: p.apiKey, model: p.model, plain: !!p.plain, profileId: p.id, contextTokens: memoryCfg.contextTokens, maxOutputTokens: memoryCfg.maxOutputTokens, keepTurns: memoryCfg.keepTurns, autoSummary: memoryCfg.autoSummary !== false }));
+  saveLLMConfig({ baseUrl: p.baseUrl, model: p.model, plain: !!p.plain, profileId: p.id, contextTokens: memoryCfg.contextTokens, maxOutputTokens: memoryCfg.maxOutputTokens, keepTurns: memoryCfg.keepTurns, autoSummary: memoryCfg.autoSummary !== false });
   $('#llm-base').value = p.baseUrl || '';
-  $('#llm-key').value = p.apiKey || '';
+  fillLLMSecretField(llmCfg());
   $('#llm-model').value = p.model || '';
   $('#llm-plain').checked = !!p.plain;
   fillLLMMemoryFields(memoryCfg);
@@ -2060,38 +2128,45 @@ $('#llm-profile-sel').onchange = () => {
   $('#llm-cfg-msg').style.color = 'var(--green)';
 };
 /* 保存当前填写为档案（同名覆盖） */
-$('#llm-profile-save').onclick = () => {
+$('#llm-profile-save').onclick = async () => {
   const name = prompt('给这个 HTTPS 端点档案起个名字（如：混元 / DeepSeek / OpenAI）：', '');
   if (!name) return;
+  await llmSecretReady;
   const list = window.getProfiles();
-  const p = Object.assign({ id: window.profId(), name: name.trim(), baseUrl: $('#llm-base').value.trim(), apiKey: $('#llm-key').value.trim(), model: $('#llm-model').value.trim(), plain: $('#llm-plain').checked }, llmMemoryFields());
-  if (!p.apiKey) { $('#llm-cfg-msg').textContent = '⚠ Key 为空，确定要保存？已保存'; }
+  const enteredKey = $('#llm-key').value.trim();
+  const p = Object.assign({ id: window.profId(), name: name.trim(), baseUrl: $('#llm-base').value.trim(), model: $('#llm-model').value.trim(), plain: $('#llm-plain').checked }, llmMemoryFields());
   const idx = list.findIndex(x => x.name === p.name);
   if (idx >= 0) { p.id = list[idx].id; list[idx] = p; } else list.push(p);
+  if (enteredKey) await storeLLMSecret(enteredKey, p.id);
+  p.hasApiKey = hasLLMSecret(p.id);
   window.saveProfiles(list);
-  localStorage.setItem('wb-llm', JSON.stringify({ baseUrl: p.baseUrl, apiKey: p.apiKey, model: p.model, plain: p.plain, profileId: p.id, contextTokens: p.contextTokens, maxOutputTokens: p.maxOutputTokens, keepTurns: p.keepTurns, autoSummary: p.autoSummary }));
+  saveLLMConfig({ baseUrl: p.baseUrl, model: p.model, plain: p.plain, profileId: p.id, contextTokens: p.contextTokens, maxOutputTokens: p.maxOutputTokens, keepTurns: p.keepTurns, autoSummary: p.autoSummary });
+  fillLLMSecretField(llmCfg());
   llmBadge(); window.renderProfileSelect();
-  $('#llm-cfg-msg').textContent = '✓ 档案「' + p.name + '」已保存并启用';
+  $('#llm-cfg-msg').textContent = '✓ 档案「' + p.name + '」已保存并启用' + (p.hasApiKey ? '，密钥由本地服务保管' : '（尚未配置 Key）');
   $('#llm-cfg-msg').style.color = 'var(--green)';
 };
 /* 删除档案 */
-$('#llm-profile-del').onclick = () => {
+$('#llm-profile-del').onclick = async () => {
+  await llmSecretReady;
   const cur = llmCfg();
   if (!cur.profileId) { $('#llm-cfg-msg').textContent = '当前未选中档案'; $('#llm-cfg-msg').style.color = 'var(--yellow)'; return; }
   const list = window.getProfiles();
   const p = list.find(x => x.id === cur.profileId);
   if (p && !confirm('删除档案「' + p.name + '」？')) return;
+  await storeLLMSecret('', cur.profileId);
   window.saveProfiles(list.filter(x => x.id !== cur.profileId));
   const cfg = llmCfg(); delete cfg.profileId;
-  localStorage.setItem('wb-llm', JSON.stringify(cfg));
+  saveLLMConfig(cfg);
   window.renderProfileSelect();
   $('#llm-cfg-msg').textContent = '已删除档案（当前配置保留在输入框）';
   $('#llm-cfg-msg').style.color = 'var(--muted)';
 };
-$('#llm-save').onclick = () => {
+$('#llm-save').onclick = async () => {
+  await llmSecretReady;
+  const enteredKey = $('#llm-key').value.trim();
   const cfg = Object.assign({
     baseUrl: $('#llm-base').value.trim(),
-    apiKey: $('#llm-key').value.trim(),
     model: $('#llm-model').value.trim(),
     plain: $('#llm-plain').checked
   }, llmMemoryFields());
@@ -2106,10 +2181,24 @@ $('#llm-save').onclick = () => {
       window.saveProfiles(list);
     }
   }
-  localStorage.setItem('wb-llm', JSON.stringify(cfg));
+  if (enteredKey) await storeLLMSecret(enteredKey, cfg.profileId);
+  saveLLMConfig(cfg);
+  fillLLMSecretField(llmCfg());
   llmBadge(); window.renderProfileSelect();
-  $('#llm-cfg-msg').textContent = '✓ 已保存';
+  $('#llm-cfg-msg').textContent = hasLLMSecret(cfg.profileId) ? '✓ 已保存，密钥由本地服务保管' : '✓ 已保存（尚未配置 Key）';
   setTimeout(() => { $('#llm-cfg').style.display = 'none'; }, 500);
+};
+$('#llm-key-clear').onclick = async () => {
+  await llmSecretReady;
+  const cfg = llmCfg();
+  if (!cfg.hasApiKey || !confirm('清除当前配置保存在本地服务中的 API Key？')) return;
+  await storeLLMSecret('', cfg.profileId);
+  saveLLMConfig(cfg);
+  if (cfg.profileId && window.getProfiles) window.saveProfiles(window.getProfiles());
+  fillLLMSecretField(llmCfg());
+  llmBadge();
+  $('#llm-cfg-msg').textContent = '已清除当前配置的 Key';
+  $('#llm-cfg-msg').style.color = 'var(--muted)';
 };
 $('#llm-compress').onclick = async () => {
   const button = $('#llm-compress');
@@ -2124,13 +2213,19 @@ $('#llm-compress').onclick = async () => {
 };
 $('#llm-fetch').onclick = async () => {
   const msg = $('#llm-cfg-msg');
-  const base = $('#llm-base').value.trim(), key = $('#llm-key').value.trim();
-  if (!key) { msg.textContent = '请先填 API Key'; msg.style.color = 'var(--red)'; return; }
+  await llmSecretReady;
+  const base = $('#llm-base').value.trim(), enteredKey = $('#llm-key').value.trim();
+  const profileId = llmCfg().profileId;
+  if (enteredKey) {
+    try { await storeLLMSecret(enteredKey, profileId); fillLLMSecretField(Object.assign({}, llmCfg(), { hasApiKey: true })); }
+    catch (error) { msg.textContent = '保存 Key 失败: ' + error.message; msg.style.color = 'var(--red)'; return; }
+  }
+  if (!hasLLMSecret(profileId)) { msg.textContent = '请先填 API Key'; msg.style.color = 'var(--red)'; return; }
   msg.textContent = '拉取中…'; msg.style.color = 'var(--muted)';
   try {
     const r = await fetch('/wb/api/llm', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'models', baseUrl: base, apiKey: key })
+      body: JSON.stringify({ action: 'models', baseUrl: base, profileId: profileId || undefined })
     });
     const j = await r.json();
     if (j.error) throw new Error(j.error.message || JSON.stringify(j.error).slice(0, 100));
@@ -2213,11 +2308,12 @@ function estimateTokens(value) {
   return cjk + Math.ceil((text.length - cjk) / 4);
 }
 async function rawLLMRequest(cfg, messages, maxTokens) {
+  await llmSecretReady;
   const r = await fetch('/wb/api/llm', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model,
+      baseUrl: cfg.baseUrl, profileId: cfg.profileId || undefined, model: cfg.model,
       maxTokens: boundedInt(maxTokens, cfg.maxOutputTokens, 256, 8192),
       messages
     })
@@ -2236,7 +2332,7 @@ function memoryTranscript(turns) {
 }
 async function compactActiveSession(force) {
   const cfg = llmCfg();
-  if (!cfg.apiKey) throw new Error('请先配置大模型 API Key');
+  if (!cfg.hasApiKey) throw new Error('请先配置大模型 API Key');
   const session = activeSession();
   const memory = ensureSessionMemory(session);
   const keepMessages = force ? Math.min(2, memory.turns.length) : Math.min(memory.turns.length, cfg.keepTurns * 2);
@@ -2366,7 +2462,7 @@ function aiSend() {
   aiMsg('me', esc(text));
   term('k-cmd', 'AI 指令: ' + text);
   const cfg = llmCfg();
-  if (cfg.apiKey) {
+  if (cfg.hasApiKey) {
     llmBadge('busy');
     const prof = cfg.profileId && window.getProfiles ? window.getProfiles().find(p => p.id === cfg.profileId) : null;
     const src = 'via ' + (prof ? prof.name + '·' + (prof.model || cfg.model) : (cfg.model || 'LLM'));
@@ -2399,7 +2495,7 @@ function aiSend() {
 function ruleEngineReply(text) {
   setTimeout(() => {
     const plan = makePlan(text);
-    const degraded = llmCfg().apiKey ? '' : '<br><span style="color:var(--yellow);font-size:11px">⚠ 降级模式（内置规则引擎，仅识别固定指令）。点右上角 ⚙ 配置大模型 API Key 后可理解任意开放式指令。</span>';
+    const degraded = llmCfg().hasApiKey ? '' : '<br><span style="color:var(--yellow);font-size:11px">⚠ 降级模式（内置规则引擎，仅识别固定指令）。点右上角 ⚙ 配置大模型 API Key 后可理解任意开放式指令。</span>';
     if (!plan) {
       aiMsg('ai', '我目前擅长这些：<br>· <b>全区域配色</b>（例：换成粉色配色 / 深蓝主题）<br>· <b>气泡改色</b>（例：把 AI 气泡改成 #5b21b6）<br>· <b>字号/行距</b> · <b>状态栏美化</b> · <b>日夜切换</b><br>· <b>装载美化包</b> · <b>发布到角色卡</b> · <b>清除注入</b> · <b>体检</b><br>你也可以直接在「编辑」页签手写代码，实时生效。' + degraded, { src: '规则引擎' });
       return;
@@ -2434,7 +2530,7 @@ $('#degraded-cfg').onclick = () => {
   box.style.display = 'block';
   const c = llmCfg();
   $('#llm-base').value = c.baseUrl || 'https://api.hunyuan.cloud.tencent.com/v1';
-  $('#llm-key').value = c.apiKey || '';
+  fillLLMSecretField(c);
   $('#llm-model').value = c.model || 'hunyuan-lite';
   $('#llm-plain').checked = !!c.plain;
   fillLLMMemoryFields(c);
@@ -3564,8 +3660,14 @@ $('#center-expand').onclick = () => setCol('center', false);
 /* ---- AI 端点档案（多端点+密钥保存，一键切换） ---- */
 const LLM_PROFILES_STORE = 'wb-llm-profiles';
 function profId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
-function getProfiles() { try { const a = JSON.parse(localStorage.getItem(LLM_PROFILES_STORE) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
-function saveProfiles(list) { try { localStorage.setItem(LLM_PROFILES_STORE, JSON.stringify(list)); } catch (e) {} }
+function cleanProfile(profile) {
+  const clean = Object.assign({}, profile);
+  delete clean.apiKey;
+  clean.hasApiKey = window.hasLLMSecret && clean.id ? window.hasLLMSecret(clean.id) : clean.hasApiKey === true;
+  return clean;
+}
+function getProfiles() { try { const a = JSON.parse(localStorage.getItem(LLM_PROFILES_STORE) || '[]'); return Array.isArray(a) ? a.map(cleanProfile) : []; } catch (e) { return []; } }
+function saveProfiles(list) { try { localStorage.setItem(LLM_PROFILES_STORE, JSON.stringify((list || []).map(cleanProfile))); } catch (e) {} }
 function renderProfileSelect() {
   const sel = $('#llm-profile-sel'); if (!sel) return;
   const list = getProfiles();
